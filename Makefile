@@ -1,4 +1,4 @@
-.PHONY: help venv db-up db-down db-logs psql data phase1 phase2 phase3 phase4 app test clean-db reset
+.PHONY: help venv db-up db-down db-logs db-create psql data reconcile load phase2 phase3 phase4 app test clean-db reset
 .DEFAULT_GOAL := help
 
 PY := .venv/bin/python
@@ -28,8 +28,23 @@ db-logs:  ## Tail Postgres logs
 psql:  ## Open a psql shell
 	docker compose exec db psql -U $${PGUSER:-dhia} -d $${PGDATABASE:-dhia}
 
+db-create:  ## Create the dhia role and database on a NATIVE postgres (needs sudo)
+	sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$${PGUSER:-dhia}'" \
+	  | grep -q 1 || sudo -u postgres psql -c \
+	  "CREATE ROLE $${PGUSER:-dhia} LOGIN PASSWORD '$${PGPASSWORD:-dhia}';"
+	sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$${PGDATABASE:-dhia}'" \
+	  | grep -q 1 || sudo -u postgres psql -c \
+	  "CREATE DATABASE $${PGDATABASE:-dhia} OWNER $${PGUSER:-dhia};"
+	@echo "role and database ready"
+
 data:  ## Phase 0 — download and verify all sources
 	$(PY) -m src.phase0_acquire
+
+reconcile:  ## Phase 1a — build the district crosswalk
+	$(PY) -m src.phase1_reconcile
+
+load:  ## Phase 1b — build schema and load the database
+	$(PY) -m src.phase1_load
 
 test:  ## Run the test suite
 	$(PY) -m pytest

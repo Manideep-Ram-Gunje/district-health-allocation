@@ -47,6 +47,8 @@ state-level norms. **This is the project's principal methodological weakness**
 and is stated in the README rather than buried.
 
 **4. 115 distinct indicator name strings, but only 104 indicator numbers.**
+*(After the malformed rows in challenge 5 are rescued, 10 numbers carry more
+than one name string — see `reports/data_quality_report.md`.)*
 The verification step flagged 115 unique values in the `Indicator` column
 against an expected 104. Investigation: eight indicators have more than one
 name string, differing only in whitespace and line-break artefacts from PDF
@@ -158,3 +160,78 @@ household size in rural and urban areas, but rural households are slightly
 larger, so rural population is mildly *under*-estimated. The bias is
 conservative for our purpose — it understates rural need rather than inflating
 it. Chandigarh and Lakshadweep being absent accounts for a negligible share.
+
+---
+
+## Phase 1b — schema and load
+
+**Built.** Two-schema Postgres model (`sql/01_schema.sql`), idempotent loader
+(`src/phase1_load.py`), data quality report, 18 tests.
+
+`staging` holds verbatim source data with every column as `text` — the NFHS
+source encodes missingness as `NA` and small-sample suppression as `*`, and
+casting on load would destroy that distinction. `core` is typed and
+constrained. Everything downstream reads only from `core`.
+
+**Result.**
+
+| Table | Rows |
+|---|---|
+| `staging.nfhs5_raw` | 73,319 |
+| `core.indicator` | 104 (7 in index, 10 with unstable names) |
+| `core.district` | 705 |
+| `core.district_indicator` | 73,319 |
+| `core.weight_scheme` | 21 (3 schemes) |
+
+### Constraints that encode the methodology
+
+The schema refuses to hold a contradiction rather than trusting the loader:
+
+- `apportioned_implies_siblings` — `is_apportioned` must equal
+  `n_sharing_parent > 1`. The two can never drift apart.
+- `rural_not_exceeding_total` — rural population cannot exceed total.
+- `index_members_fully_specified` — any indicator marked `in_index` must have
+  a key, a domain and a direction. An indicator cannot enter the Need Index
+  half-configured.
+- `indicator_id BETWEEN 1 AND 104` — catches a bad regex parse at insert time.
+
+### Challenges
+
+**1. `libpq` silently overrode the connection URL.** Testing against a
+throwaway Postgres, connections kept landing on the wrong port despite
+`DATABASE_URL` being set explicitly. Cause: the URL omitted the port, and
+libpq fills any parameter the URL omits from the `PG*` environment variables —
+which `.env` had already populated via `load_dotenv`. The override is silent
+and there is no warning. Documented in `.env.example`: if you set
+`DATABASE_URL`, spell the port out.
+
+**2. `pytest` and `python -m pytest` do not agree on `sys.path`.** The `-m`
+form prepends the current directory, the console script does not, so
+`from src.config import ...` resolved under one and raised
+`ModuleNotFoundError` under the other. Fixed properly in `pyproject.toml` with
+`pythonpath = ["."]` rather than by telling people which command to type.
+
+**3. Two malformed rows were rescued rather than dropped.** The Maharashtra/
+Raigarh rows where the PDF extractor merged a section header into the
+indicator name are recovered with a secondary regex. This is why the count of
+indicators with unstable names rises from 8 (raw) to 10 (loaded) — the two
+rescued strings become extra name variants for indicators 20 and 98. Neither
+is in the index.
+
+### Validation — population conservation
+
+The strongest check in the project so far. Total population summed across all
+705 loaded districts:
+
+```
+loaded                    1,209,735,047
+Census 2011 all-India     1,210,854,977
+gap                           1,119,930
+Chandigarh + Lakshadweep      1,119,923   <- the two UTs with no NFHS factsheet
+unexplained residual                  7   <- apportionment rounding
+```
+
+Population is conserved to seven people across 118 apportioned districts. If
+the split logic were double-counting or dropping population, this number would
+be in the millions. It is asserted in `tests/test_load.py` so it cannot
+regress silently.
