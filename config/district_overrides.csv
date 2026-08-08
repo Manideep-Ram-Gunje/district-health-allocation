@@ -1,0 +1,115 @@
+nfhs_state,nfhs_district,census_state,census_district,rule,note
+# ---------------------------------------------------------------------------
+# Manual crosswalk overrides. Applied BEFORE fuzzy matching and always win.
+#
+#   rule = rename    same geography, different name across the two vintages
+#   rule = child_of  post-2011 district carved out of the named Census parent
+#   rule = exclude   deliberately not matched (reason in note)
+#
+# Every census_district string here was verified to exist in the Census 2011
+# file for that state before being written. A typo produces a loud
+# "OVERRIDE TARGET NOT FOUND" in the Phase 1 output rather than a silent miss.
+#
+# child_of rows do NOT get their own population — they share the parent's,
+# apportioned equally among siblings. See reports/reconciliation_report.md.
+# ---------------------------------------------------------------------------
+
+# --- pure renames ----------------------------------------------------------
+Uttar Pradesh,Prayagraj,UTTAR PRADESH,Allahabad,rename,Renamed 2018
+Uttarakhand,Pauri Garhwal,UTTARAKHAND,Garhwal,rename,Census lists as Garhwal
+Puducherry,Puducherry,PONDICHERRY,PONDICHERRY,rename,UT renamed 2006; Census still Pondicherry
+Chhattisgarh,Dantewada,CHHATTISGARH,Dakshin Bastar Dantewada,rename,Census uses the long form
+Gujarat,Dahod,GUJARAT,Dohad,rename,Transliteration variant
+Gujarat,Panchmahal,GUJARAT,Panch Mahals,rename,Spacing and plural variant
+Gujarat,Sabarkantha,GUJARAT,Sabar Kantha,rename,Spacing variant
+
+# --- Telangana: created 2014 from Andhra Pradesh ---------------------------
+# The largest single crosswalk problem here. Census 2011 has 10 districts in
+# what is now Telangana; NFHS-5 has 31. Parents below are the 2011 districts.
+Telangana,Bhadradri Kothagudem,ANDHRA PRADESH,Khammam,child_of,2016 reorganisation
+Telangana,Jagitial,ANDHRA PRADESH,Karimnagar,child_of,2016 reorganisation
+Telangana,Jangoan,ANDHRA PRADESH,Warangal,child_of,2016 reorganisation
+Telangana,Jayashankar Bhupalapally,ANDHRA PRADESH,Warangal,child_of,2016 reorganisation
+Telangana,Jogulamba Gadwal,ANDHRA PRADESH,Mahbubnagar,child_of,2016 reorganisation
+Telangana,Kamareddy,ANDHRA PRADESH,Nizamabad,child_of,2016 reorganisation
+Telangana,Komaram Bheem Asifabad,ANDHRA PRADESH,Adilabad,child_of,2016 reorganisation
+Telangana,Mahabubabad,ANDHRA PRADESH,Warangal,child_of,2016 reorganisation
+Telangana,Mancherial,ANDHRA PRADESH,Adilabad,child_of,2016 reorganisation
+Telangana,Medchal-Malkajgiri,ANDHRA PRADESH,Rangareddy,child_of,2016 reorganisation
+Telangana,Nagarkurnool,ANDHRA PRADESH,Mahbubnagar,child_of,2016 reorganisation
+Telangana,Nirmal,ANDHRA PRADESH,Adilabad,child_of,2016 reorganisation
+Telangana,Peddapalli,ANDHRA PRADESH,Karimnagar,child_of,2016 reorganisation
+Telangana,Rajanna Sircilla,ANDHRA PRADESH,Karimnagar,child_of,2016 reorganisation
+Telangana,Siddipet,ANDHRA PRADESH,Medak,child_of,2016 reorganisation
+Telangana,Suryapet,ANDHRA PRADESH,Nalgonda,child_of,2016 reorganisation
+Telangana,Vikarabad,ANDHRA PRADESH,Rangareddy,child_of,2016 reorganisation
+Telangana,Wanaparthy,ANDHRA PRADESH,Mahbubnagar,child_of,2016 reorganisation
+Telangana,Warangal Rural,ANDHRA PRADESH,Warangal,child_of,2016 reorganisation
+Telangana,Warangal Urban,ANDHRA PRADESH,Warangal,child_of,2016 reorganisation
+Telangana,Yadadri Bhuvanagiri,ANDHRA PRADESH,Nalgonda,child_of,2016 reorganisation
+
+# --- Chhattisgarh: 2012 and 2020 splits ------------------------------------
+Chhattisgarh,Balod,CHHATTISGARH,Durg,child_of,Created 2012
+Chhattisgarh,Baloda Bazar,CHHATTISGARH,Raipur,child_of,Created 2012
+Chhattisgarh,Balrampur,CHHATTISGARH,Surguja,child_of,Created 2012
+Chhattisgarh,Bemetara,CHHATTISGARH,Durg,child_of,Created 2012
+Chhattisgarh,Gariyaband,CHHATTISGARH,Raipur,child_of,Created 2012
+Chhattisgarh,Kodagaon,CHHATTISGARH,Bastar,child_of,Kondagaon created 2012
+Chhattisgarh,Mungeli,CHHATTISGARH,Bilaspur,child_of,Created 2012
+Chhattisgarh,Sukma,CHHATTISGARH,Dakshin Bastar Dantewada,child_of,Created 2012
+Chhattisgarh,Surajpur,CHHATTISGARH,Surguja,child_of,Created 2012
+
+# --- Gujarat: 2013 splits --------------------------------------------------
+Gujarat,Aravali,GUJARAT,Sabar Kantha,child_of,Created 2013
+Gujarat,Botad,GUJARAT,Bhavnagar,child_of,Created 2013
+Gujarat,Chhota Udaipur,GUJARAT,Vadodara,child_of,Created 2013
+Gujarat,Devbhumi Dwarka,GUJARAT,Jamnagar,child_of,Created 2013
+Gujarat,Gir Somnath,GUJARAT,Junagadh,child_of,Created 2013
+Gujarat,Mahisagar,GUJARAT,Panch Mahals,child_of,Created 2013
+Gujarat,Morbi,GUJARAT,Rajkot,child_of,Created 2013
+
+# --- Assam -----------------------------------------------------------------
+Assam,Biswanath,ASSAM,Sonitpur,child_of,Created 2015
+Assam,Charaideo,ASSAM,Sivasagar,child_of,Created 2015
+Assam,Hojai,ASSAM,Nagaon,child_of,Created 2015
+Assam,Majuli,ASSAM,Jorhat,child_of,Created 2016
+Assam,South Salmara Mancachar,ASSAM,Dhubri,child_of,Created 2015
+Assam,West Karbi Anglong,ASSAM,Karbi Anglong,child_of,Created 2016; guard refused sibling match
+
+# --- Meghalaya: guard refused sibling matches ------------------------------
+Meghalaya,East Jantia Hills,MEGHALAYA,Jaintia Hills,child_of,Jaintia Hills split 2012
+Meghalaya,West Jaintia Hills,MEGHALAYA,Jaintia Hills,child_of,Jaintia Hills split 2012
+Meghalaya,North Garo Hills,MEGHALAYA,East Garo Hills,child_of,Created 2012
+Meghalaya,South West Garo Hills,MEGHALAYA,West Garo Hills,child_of,Created 2012
+Meghalaya,South West Khasi Hills,MEGHALAYA,West Khasi Hills,child_of,Created 2012
+
+# --- Arunachal Pradesh -----------------------------------------------------
+Arunachal Pradesh,Kra Daadi,ARUNACHAL PRADESH,Kurung Kumey,child_of,Created 2015
+Arunachal Pradesh,Longding,ARUNACHAL PRADESH,Tirap,child_of,Created 2012
+Arunachal Pradesh,Namsai,ARUNACHAL PRADESH,Lohit,child_of,Created 2014
+Arunachal Pradesh,Siang,ARUNACHAL PRADESH,West Siang,child_of,Created 2015
+
+# --- Tripura: 2011 reorganisation ------------------------------------------
+Tripura,Gomati,TRIPURA,South Tripura,child_of,Created 2012
+Tripura,Khowai,TRIPURA,West Tripura,child_of,Created 2012
+Tripura,Sepahijala,TRIPURA,West Tripura,child_of,Created 2012
+Tripura,Unakoti,TRIPURA,North Tripura,child_of,Created 2012
+
+# --- Uttar Pradesh ---------------------------------------------------------
+Uttar Pradesh,Amethi,UTTAR PRADESH,Sultanpur,child_of,Created 2010; largest share from Sultanpur
+Uttar Pradesh,Hapur,UTTAR PRADESH,Ghaziabad,child_of,Created 2011
+Uttar Pradesh,Sambhal,UTTAR PRADESH,Moradabad,child_of,Created 2011
+Uttar Pradesh,Shamli,UTTAR PRADESH,Muzaffarnagar,child_of,Created 2011
+
+# --- West Bengal -----------------------------------------------------------
+West Bengal,Purba Barddhaman,WEST BENGAL,Barddhaman,child_of,Bardhaman split 2017
+West Bengal,Paschim Barddhaman,WEST BENGAL,Barddhaman,child_of,Bardhaman split 2017
+
+# --- remaining single splits -----------------------------------------------
+Punjab,Fazilka,PUNJAB,Firozpur,child_of,Created 2011
+Punjab,Pathankot,PUNJAB,Gurdaspur,child_of,Created 2011
+Haryana,Charkhi Dadri,HARYANA,Bhiwani,child_of,Created 2016
+Madhya Pradesh,Agar Malwa,MADHYA PRADESH,Shajapur,child_of,Created 2013
+Maharashtra,Palghar,MAHARASHTRA,Thane,child_of,Created 2014
+NCT Delhi,Shahdara,NCT OF DELHI,East,child_of,Created 2012
+NCT Delhi,South East,NCT OF DELHI,South,child_of,Created 2012; guard refused North East

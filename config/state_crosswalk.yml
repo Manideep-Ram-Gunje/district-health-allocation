@@ -1,0 +1,81 @@
+# ---------------------------------------------------------------------------
+# NFHS-5 (2019-21) state names -> candidate Census 2011 state names.
+#
+# Keys are the EXACT strings in the NFHS-5 extract (verified against the file,
+# not assumed — the extract uses "NCT Delhi", "Jammu Kashmir" and
+# "Dadra Nagar Haveli Daman Diu" with no ampersands or "and"s).
+#
+# District matching is done WITHIN state. Matching nationally produces false
+# positives: there is an Aurangabad in both Maharashtra and Bihar, a Bilaspur
+# in both Chhattisgarh and Himachal Pradesh, a Hamirpur in both HP and UP.
+# So this map has to be right before the district fuzzy match runs at all.
+#
+# The interesting entries are the reorganisations — a 2019-21 state can map to
+# MORE than one 2011 state, or to a state that did not exist in 2011.
+#
+# Note: Census 2011 has 35 states/UTs, NFHS-5 has 34 here. Chandigarh and
+# Lakshadweep have no district factsheet in this extract; they simply never
+# appear on the NFHS side and are absent from the allocation.
+# ---------------------------------------------------------------------------
+
+states:
+  Andaman Nicobar Islands: [ANDAMAN AND NICOBAR ISLANDS]
+  Andhra Pradesh: [ANDHRA PRADESH]
+  Arunachal Pradesh: [ARUNACHAL PRADESH]
+  Assam: [ASSAM]
+  Bihar: [BIHAR]
+  Chhattisgarh: [CHHATTISGARH]
+  Goa: [GOA]
+  Gujarat: [GUJARAT]
+  Haryana: [HARYANA]
+  Himachal Pradesh: [HIMACHAL PRADESH]
+  Jharkhand: [JHARKHAND]
+  Karnataka: [KARNATAKA]
+  Kerala: [KERALA]
+  Madhya Pradesh: [MADHYA PRADESH]
+  Maharashtra: [MAHARASHTRA]
+  Manipur: [MANIPUR]
+  Meghalaya: [MEGHALAYA]
+  Mizoram: [MIZORAM]
+  NCT Delhi: [NCT OF DELHI]
+  Nagaland: [NAGALAND]
+  Odisha: [ORISSA]                     # renamed 2011; Census file still says ORISSA
+  Puducherry: [PONDICHERRY]            # renamed 2006; Census file still says PONDICHERRY
+  Punjab: [PUNJAB]
+  Rajasthan: [RAJASTHAN]
+  Sikkim: [SIKKIM]
+  Tamil Nadu: [TAMIL NADU]
+  Tripura: [TRIPURA]
+  Uttar Pradesh: [UTTAR PRADESH]
+  Uttarakhand: [UTTARAKHAND]
+  West Bengal: [WEST BENGAL]
+
+  # --- reorganisations between the two vintages -----------------------------
+
+  # Telangana was carved out of Andhra Pradesh in 2014. In Census 2011 its
+  # districts are still filed under ANDHRA PRADESH, so we search there.
+  # This is the single largest crosswalk problem in the project: AP's 23
+  # Census districts have to serve both modern AP and Telangana's 33.
+  Telangana: [ANDHRA PRADESH]
+
+  # J&K was reorganised into two UTs in 2019. Census 2011 has one state
+  # containing Leh and Kargil, so both NFHS entities search the same source.
+  Jammu Kashmir: [JAMMU AND KASHMIR]
+  Ladakh: [JAMMU AND KASHMIR]
+
+  # DNH and Daman & Diu merged into a single UT in 2020; Census has two.
+  Dadra Nagar Haveli Daman Diu: [DADRA AND NAGAR HAVELI, DAMAN AND DIU]
+
+# ---------------------------------------------------------------------------
+# Zonal groupings, used for the "minimum 1 facility per region" equity
+# constraint in Phase 3. These follow the Zonal Councils constituted under the
+# States Reorganisation Act 1956, plus the North Eastern Council. Keys on the
+# left of `states:` above must all appear here or they get a null region.
+# ---------------------------------------------------------------------------
+regions:
+  North:      [Haryana, Himachal Pradesh, Jammu Kashmir, Ladakh, NCT Delhi, Punjab, Rajasthan]
+  Central:    [Chhattisgarh, Madhya Pradesh, Uttar Pradesh, Uttarakhand]
+  East:       [Bihar, Jharkhand, Odisha, West Bengal]
+  West:       [Dadra Nagar Haveli Daman Diu, Goa, Gujarat, Maharashtra]
+  South:      [Andaman Nicobar Islands, Andhra Pradesh, Karnataka, Kerala, Puducherry, Tamil Nadu, Telangana]
+  North East: [Arunachal Pradesh, Assam, Manipur, Meghalaya, Mizoram, Nagaland, Sikkim, Tripura]
