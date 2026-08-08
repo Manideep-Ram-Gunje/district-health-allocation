@@ -60,15 +60,18 @@ by design. Confirm with `git count-objects -vH` that the pack is under ~50 MB.
 1. Go to <https://share.streamlit.io> and sign in with GitHub.
 2. **New app** → pick the repository and the `main` branch.
 3. **Main file path:** `app/streamlit_app.py`
-4. Open **Advanced settings** and set:
-   - Python version: **3.12**
-   - Requirements file: **`requirements-app.txt`**
+4. Open **Advanced settings**, set Python version to **3.12**, and leave the
+   **Secrets** box completely EMPTY. Secrets expects TOML environment variables
+   (`KEY = "value"`); pasting anything else there fails with "invalid format".
+   This app needs no secrets — it runs from the committed snapshot.
 5. Deploy. First build takes 2–4 minutes.
 
-**Use `requirements-app.txt`, not `requirements.txt`.** The full file pulls in
-geopandas and fiona, which need GDAL system libraries and are the usual reason a
-Streamlit Cloud build fails. The deployed app never touches them — it reads the
-pre-simplified snapshot geojson as plain JSON.
+**There is no "requirements file" setting.** Streamlit Cloud always installs
+`requirements.txt` from the repo root and offers no way to point elsewhere.
+That is why the root file is deliberately the SMALL app-only set, and the full
+pipeline dependencies live in `requirements-pipeline.txt`. Putting geopandas
+and fiona in the root file drags in GDAL system libraries and is the most
+common cause of a failed build.
 
 ### Verify the deployment
 
@@ -87,8 +90,8 @@ Then check:
 
 ## Troubleshooting
 
-**Build fails on `fiona` or `GDAL`.** You are using `requirements.txt`. Switch to
-`requirements-app.txt` in Advanced settings.
+**Build fails on `fiona` or `GDAL`.** Something re-added the geospatial packages
+to the root `requirements.txt`. They belong in `requirements-pipeline.txt`.
 
 **App loads but shows "No data source".** The snapshot was not committed.
 `data/processed/*.parquet` is gitignored; the snapshot directory is re-included

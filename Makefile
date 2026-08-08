@@ -10,7 +10,7 @@ help:  ## Show this help
 venv:  ## Create .venv and install requirements
 	python3 -m venv .venv
 	$(PIP) install --upgrade pip
-	$(PIP) install -r requirements.txt
+	$(PIP) install -r requirements-pipeline.txt
 	@echo "done — activate with: source .venv/bin/activate"
 
 db-up:  ## Start Postgres 15 (docker compose)
@@ -58,13 +58,16 @@ sensitivity:  ## Phase 4 — Dirichlet weight sensitivity
 geo:  ## Phase 5a — match map polygons to districts
 	$(PY) -m src.phase5_geo
 
+residual:  ## Phase 7 — socioeconomic residual model
+	$(PY) -m src.phase7_residual
+
 snapshot:  ## Export a file-based snapshot so the app runs without Postgres
 	$(PY) -m src.snapshot
 
 app:  ## Phase 5b — launch the Streamlit app
 	.venv/bin/streamlit run app/streamlit_app.py
 
-pipeline: data reconcile load analytics allocate sensitivity geo snapshot  ## Run every phase end to end
+pipeline: data reconcile load analytics allocate sensitivity residual geo snapshot  ## Run every phase end to end
 
 test:  ## Run the test suite
 	$(PY) -m pytest

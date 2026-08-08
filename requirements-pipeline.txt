@@ -1,0 +1,29 @@
+# ---------------------------------------------------------------------------
+# FULL pipeline requirements — everything needed to rebuild the project from
+# raw data. Use this locally; `make venv` installs it.
+#
+# requirements.txt (the app subset) is installed first, because a deployment
+# platform reads that file and it must stay small.
+# ---------------------------------------------------------------------------
+
+-r requirements.txt
+
+# --- record linkage ---
+rapidfuzz==3.9.3
+
+# --- database ---
+psycopg2-binary==2.9.9
+
+# --- modelling (Phase 7 only) ---
+scikit-learn==1.5.0
+
+# --- geo (Phase 5a only; needs GDAL system libraries) ---
+geopandas==0.14.4
+shapely==2.0.4
+
+# --- reporting ---
+# pandas.DataFrame.to_markdown() needs this; it is never imported by name.
+tabulate==0.9.0
+
+# --- tests ---
+pytest==8.2.2

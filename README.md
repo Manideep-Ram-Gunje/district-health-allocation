@@ -105,6 +105,38 @@ config, because it is a policy judgement, not a technical one. It moves 9 of the
 
 ---
 
+### 4. Some districts are far sicker than their poverty explains
+
+The Need Index says *how bad* outcomes are. It cannot separate a district that
+is unhealthy **because it is poor** from one that is unhealthy **beyond what its
+poverty explains** — and a new facility plausibly helps the second far more.
+
+So the index is modelled from Census socioeconomic variables (literacy,
+electrification, sanitation, piped water, cooking fuel, caste composition,
+workforce structure) and the **residuals** are the object of interest.
+Out-of-fold **R² = 0.657** (random forest, 5-fold; ridge gives 0.537).
+
+A high R² would *not* be a good result here — it would mean health outcomes are
+fully determined by material conditions, leaving no room for a health-system
+signal. The useful quantity is what the model cannot explain.
+
+| District | State | Actual need | Predicted | Residual |
+|---|---|---|---|---|
+| Kamrup Metropolitan | Assam | 0.622 | 0.171 | **+0.451** |
+| Mewat | Haryana | 0.835 | 0.461 | +0.374 |
+| Jalgaon | Maharashtra | 0.724 | 0.380 | +0.345 |
+| Deoghar | Jharkhand | 0.919 | 0.584 | +0.335 |
+| Patna | Bihar | 0.810 | 0.536 | +0.274 |
+
+Kamrup Metropolitan is Guwahati — a state capital with a relatively strong
+socioeconomic profile and health outcomes far below it. Mewat is a documented
+outlier in Indian public health despite sitting an hour from Delhi. Patna is
+another state capital. These are not the districts a need ranking alone
+surfaces, and that is the point.
+
+The residual is **not** used to drive the allocation. It is a second lens;
+folding it into the objective without a causal argument would be indefensible.
+
 ## Quick start
 
 Requires Python 3.10+ and PostgreSQL 15+.
