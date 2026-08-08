@@ -341,3 +341,89 @@ Top-25 overlap between weighting schemes, out of 25:
 
 Substantial but not total agreement — which is the honest answer, and sets up
 Phase 4 to quantify it properly across 10,000 sampled weight vectors.
+
+---
+
+## Phase 3 — constrained allocation
+
+**Built.** Integer linear program in PuLP solved by CBC, three comparison
+baselines, results table and comparison view (`sql/03_allocation.sql`),
+`src/phase3_allocate.py`, 10 more tests.
+
+```
+maximise    sum_d  need_index_d * min(catchment_norm_d, rural_pop_d) * x_d
+subject to  sum_d x_d = 25                     budget, exactly
+            sum_(d in state) x_d <= 4          equity
+            sum_(d in region) x_d >= 1         political feasibility
+            x_d in {0,1}
+```
+
+CBC returns **Optimal** — a proven optimum, not a good-enough answer.
+
+### Results
+
+| Scenario | Feasible | States | Regions | Max in one state | Coverage gain |
+|---|---|---|---|---|---|
+| `unconstrained_bound` | no | 5 | 4 | 13 | 109,084 |
+| `optimal` | **yes** | 9 | 6 | 4 | **103,285** |
+| `naive_top25` | no | 7 | 3 | 12 | 101,243 |
+| `greedy_feasible` | yes | 11 | 6 | 4 | 91,350 |
+
+- **Optimisation premium vs `greedy_feasible`: +13.07%**
+- **Optimisation premium vs `naive_top25`: +2.02%**
+- **Price of equity vs the unconstrained ceiling: −5.32%**
+
+### The result I did not expect
+
+The optimal allocation beats the naive top-25 **even though the naive list
+ignores every constraint**. My first draft of the report had the narrative
+written the other way round — assuming the constrained answer must score lower
+and framing the gap as the cost of equity. The data said otherwise, so the
+explanation had to be rebuilt rather than the number explained away.
+
+The cause: *the thing you sort on is not the thing you are maximising.* The
+need index answers "how badly off is this district". The objective answers "how
+much good does one more facility do here". They diverge because coverage gain
+caps at the catchment norm — a district of 4 million and one of 40,000 both get
+one facility's worth of benefit, and a district whose entire rural population
+is below the norm cannot absorb even that. Terrain shifts the coefficient too
+(5,000 in plains, 3,000 in hilly or tribal).
+
+So sorting by the headline metric produces a list that is both inadmissible
+**and** leaves value on the table. That is a stronger answer to "why not just
+sort?" than the constraint argument on its own.
+
+Adding `unconstrained_bound` — top 25 by the objective itself, constraints
+dropped — completes the decomposition. It is the true ceiling, so the −5.32%
+gap to the optimum is the genuine price of equity, measured against something
+achievable-in-principle rather than against a list nobody could execute.
+
+The binding constraint is the state cap: unconstrained, Bihar takes 13 of 25
+and Uttar Pradesh 6, reaching only 4 of 6 regions.
+
+### Challenges
+
+**1. `tabulate` was an undeclared dependency.** Phase 2 completed every
+computation, wrote its CSV, then crashed writing the markdown report —
+`pandas.to_markdown()` requires `tabulate`, which was present in the
+development environment and absent from `requirements.txt`. An optional
+dependency of a package you *do* declare fails only at the moment of use, and
+here that moment was after all the real work had succeeded.
+
+Rather than just adding the line, `tests/test_dependencies.py` now enforces the
+invariant: every third-party module the code imports must appear in
+`requirements.txt`, and known implicit dependencies (`to_markdown` ->
+`tabulate`, `read_parquet` -> `pyarrow`) must too.
+
+**2. That guard was wrong twice before it was right** — worth recording,
+because both failures are instructive:
+
+- It scanned *itself* and reported `openpyxl` as missing, because its own
+  lookup table contains the literal strings `read_excel` and `openpyxl`.
+- Its regex matched SQL inside triple-quoted strings: `from core.district d
+  join ...` looked like an import of a module named `core`, and `from r a join
+  r b` like one named `r`.
+
+Fixed by excluding the file from its own scan and by parsing the **AST**
+instead of pattern-matching source text. A regex over code is a guess about
+syntax; `ast.walk` knows what an import actually is.

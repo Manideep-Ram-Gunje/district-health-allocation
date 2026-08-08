@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# Allocation problem definition.
+#
+# These are the numbers a State Health Society would hand you, and they are the
+# reason optimisation is not the same thing as sorting. Change them here and
+# the whole allocation moves — the Streamlit app exposes them as controls.
+# ---------------------------------------------------------------------------
+
+budget: 25                # Sub-Centres sanctioned
+
+constraints:
+
+  max_per_state: 4
+  # Rationale: a national programme that put 11 of 25 facilities in one state
+  # would not survive a Finance Commission review, regardless of what the need
+  # data said. This is the binding constraint in practice — see the report.
+
+  min_per_region: 1
+  # Rationale: political feasibility. Every Zonal Council must see something.
+  # Six regions, so this consumes at minimum 6 of the 25 facilities.
+
+# ---------------------------------------------------------------------------
+# Objective
+#
+# Maximise total need-weighted population brought within IPHS catchment:
+#
+#     max  sum_d  need_index_d * min(catchment_norm_d, rural_population_d) * x_d
+#
+# The min() matters: one Sub-Centre cannot serve more than its catchment norm,
+# so a district of 4 million and a district of 40,000 both cap out at what a
+# single facility can deliver. Without the cap the model would simply pick the
+# largest districts and call it optimisation.
+# ---------------------------------------------------------------------------
+
+objective: coverage_gain
+
+# ---------------------------------------------------------------------------
+# Baselines to compare against.
+#
+# naive_top25      Sort by need index, take 25, ignore constraints entirely.
+#                  Usually INFEASIBLE. Reported anyway, because it is what
+#                  "just rank them" actually produces and the violations are
+#                  the interesting part.
+#
+# greedy_feasible  Walk down the need ranking, skip anything that would breach
+#                  the state cap, then patch in the empty regions. This is what
+#                  a competent analyst produces in a spreadsheet in an hour,
+#                  and it IS feasible — so it is the honest thing to measure
+#                  the optimiser against.
+# ---------------------------------------------------------------------------
+
+#
+# unconstrained_bound  Top 25 by the OBJECTIVE, constraints dropped. The true
+#                      ceiling — no feasible allocation can beat it. The gap
+#                      between this and the optimum is the price of equity,
+#                      which is the number worth quoting rather than a
+#                      comparison against a list nobody could execute.
+
+baselines: [naive_top25, unconstrained_bound, greedy_feasible]
+
+solver:
+  name: CBC
+  time_limit_seconds: 60
+  mip_gap: 0.0            # demand a proven optimum, not a good-enough answer

@@ -1,4 +1,4 @@
-.PHONY: help venv db-up db-down db-logs db-create psql data reconcile load analytics allocate sensitivity app test clean-db reset all
+.PHONY: help venv db-up db-down db-logs db-create psql data reconcile load analytics allocate pipeline sensitivity app test clean-db reset
 .DEFAULT_GOAL := help
 
 PY := .venv/bin/python
@@ -48,6 +48,11 @@ load:  ## Phase 1b — build schema and load the database
 
 analytics:  ## Phase 2 — build the Need Index and analytics views
 	$(PY) -m src.phase2_need_index
+
+allocate:  ## Phase 3 — solve the ILP and compare against baselines
+	$(PY) -m src.phase3_allocate
+
+pipeline: data reconcile load analytics allocate  ## Run every phase end to end
 
 test:  ## Run the test suite
 	$(PY) -m pytest

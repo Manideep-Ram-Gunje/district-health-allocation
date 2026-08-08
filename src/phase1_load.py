@@ -151,6 +151,12 @@ def main() -> int:
         ("catchment_plains", ncfg["catchment"]["plains"], "IPHS 2022 Sub-Centre norm, plains"),
         ("catchment_hilly", ncfg["catchment"]["hilly"], "IPHS 2022 Sub-Centre norm, hilly/tribal/desert"),
     ]
+    acfg = load_yaml("allocation.yml")
+    params += [
+        ("budget", acfg["budget"], "Sub-Centres sanctioned for allocation"),
+        ("max_per_state", acfg["constraints"]["max_per_state"], "Equity cap per state"),
+        ("min_per_region", acfg["constraints"]["min_per_region"], "Political feasibility floor per region"),
+    ]
     pd.DataFrame(params, columns=["key", "value", "note"]).to_sql(
         "param", eng, schema="core", if_exists="append", index=False)
     print(f"  core.param              {len(params):,}")
