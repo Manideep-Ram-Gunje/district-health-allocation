@@ -139,11 +139,11 @@ folding it into the objective without a causal argument would be indefensible.
 
 ## Quick start
 
-Requires Python 3.10+ and PostgreSQL 15+.
+Requires Python 3.10+ and PostgreSQL 15+. **Live demo:** https://district-health-allocation-pohllxwaukamsafzd5dyh7.streamlit.app/
 
 ```bash
 # 1 — environment
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements-pipeline.txt
 cp .env.example .env
 
 # 2 — database (native install)
@@ -155,8 +155,8 @@ make db-create
 #    make db-up          # publishes on 5433; set PGPORT=5433 in .env
 
 # 3 — everything
-make pipeline           # acquire → reconcile → load → index → allocate → sensitivity → geo → snapshot
-make test               # 76 tests
+make pipeline           # acquire → reconcile → load → index → allocate → sensitivity → residual → geo → snapshot
+make test               # 82 tests
 make app                # http://localhost:8501
 ```
 
@@ -281,9 +281,10 @@ config/       sources, indicators, crosswalk, overrides, IPHS norms, allocation,
 sql/          01 schema · 02 analytics · 03 allocation · 04 sensitivity
 src/          config, datasource, snapshot + one module per phase
 app/          streamlit_app.py
-tests/        76 tests across 7 files
-reports/      six generated reports — reconciliation, quality, index, allocation, sensitivity, map
+tests/        82 tests across 8 files
+reports/      seven generated reports — reconciliation, quality, index, allocation, sensitivity, map, residual
 docs/         build-log.md — every phase, every failure, and why each decision was made
+resources/    presentation deliverables — report PDF, slide deck, recommendation memo
 data/         raw (checksummed) · interim · processed · snapshot (committed)
 ```
 
