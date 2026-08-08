@@ -1,0 +1,19 @@
+# Streamlit configuration. Committed so the app looks identical on a lab
+# machine and on a cloud deployment.
+
+[theme]
+base = "dark"
+primaryColor = "#E4572E"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1A1D24"
+textColor = "#FAFAFA"
+font = "sans serif"
+
+[server]
+# The choropleth payload is a few MB; the default 200 MB limit is generous but
+# the message size limit is what actually bites on a large plotly figure.
+maxMessageSize = 300
+headless = true
+
+[browser]
+gatherUsageStats = false

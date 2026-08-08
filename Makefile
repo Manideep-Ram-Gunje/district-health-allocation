@@ -1,4 +1,4 @@
-.PHONY: help venv db-up db-down db-logs db-create psql data reconcile load analytics allocate pipeline sensitivity app test clean-db reset
+.PHONY: help venv db-up db-down db-logs db-create psql data reconcile load analytics allocate sensitivity geo snapshot app pipeline test clean-db reset
 .DEFAULT_GOAL := help
 
 PY := .venv/bin/python
@@ -55,7 +55,16 @@ allocate:  ## Phase 3 — solve the ILP and compare against baselines
 sensitivity:  ## Phase 4 — Dirichlet weight sensitivity
 	$(PY) -m src.phase4_sensitivity
 
-pipeline: data reconcile load analytics allocate sensitivity  ## Run every phase end to end
+geo:  ## Phase 5a — match map polygons to districts
+	$(PY) -m src.phase5_geo
+
+snapshot:  ## Export a file-based snapshot so the app runs without Postgres
+	$(PY) -m src.snapshot
+
+app:  ## Phase 5b — launch the Streamlit app
+	.venv/bin/streamlit run app/streamlit_app.py
+
+pipeline: data reconcile load analytics allocate sensitivity geo snapshot  ## Run every phase end to end
 
 test:  ## Run the test suite
 	$(PY) -m pytest

@@ -76,6 +76,27 @@ sources:
     caveats:
       - "736 units vs NFHS-5's ~707 districts — the crosswalk handles the difference."
       - "Boundary vintage 2021; source data update Jan 2023."
+      - "shapeISO is EMPTY on every feature, so the file carries no state field. District names alone cannot be matched safely (there is an Aurangabad in both Maharashtra and Bihar), which is why the ADM1 layer below is also acquired."
+
+  state_boundaries:
+    description: >
+      geoBoundaries ADM1 (state/UT) polygons for India. Acquired solely to
+      recover the state of each district polygon: the ADM2 file has an empty
+      shapeISO field, so state is derived by a spatial join of district
+      representative points into state polygons. Without it, district name
+      matching would be national and would confuse same-named districts in
+      different states.
+    url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/IND/ADM1/geoBoundaries-IND-ADM1_simplified.geojson
+    filename: india_states_adm1.geojson
+    format: geojson
+    licence: Creative Commons Attribution 2.5 India (CC BY 2.5 IN)
+    provenance: https://www.geoboundaries.org/api/current/gbOpen/IND/ADM1/
+    upstream_authority: "DataMeet India community, Election Commission of India"
+    verify:
+      min_features: 30          # API reports admUnitCount = 36
+      required_properties: [shapeName]
+    caveats:
+      - "Boundary vintage 2011 for ADM1 against 2021 for ADM2, so a handful of post-2011 districts may straddle a state line drawn before their state existed. The join uses representative points, which lie inside the polygon, and the reconciliation report records any district whose state could not be resolved."
 
 # ---------------------------------------------------------------------------
 # NOT acquired automatically — see README limitation 9.3

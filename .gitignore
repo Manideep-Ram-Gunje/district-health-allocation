@@ -9,9 +9,15 @@ data/interim/
 *.prj
 *.cpg
 
-# Processed outputs are regenerable
+# Processed outputs are regenerable from the pipeline
 data/processed/*.parquet
 data/processed/*.csv
+
+# ...but the SNAPSHOT is deliberately committed. It is what lets the app run
+# on a machine with no Postgres — a cloud deployment, or a fresh clone. Roughly
+# 2 MB, derived, and regenerable with `make snapshot`.
+!data/processed/snapshot/
+!data/processed/snapshot/*
 
 # ---- secrets / env ----
 .env

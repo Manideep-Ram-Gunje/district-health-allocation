@@ -598,3 +598,76 @@ So the honest answer to *"what did optimisation buy you over sorting?"* is:
 
 Claiming a fabricated premium would have been easier and would not have
 survived the first competent interviewer. This version invites the question.
+
+---
+
+## Phase 5 — map, app, and making it deployable
+
+**Built.** Polygon crosswalk (`src/phase5_geo.py`), Streamlit application
+(`app/streamlit_app.py`), a data-access layer (`src/datasource.py`) and a
+snapshot exporter (`src/snapshot.py`).
+
+### Challenges
+
+**1. The map file has no state column.** geoBoundaries ADM2 carries an **empty
+`shapeISO` on every one of its 735 features**. Matching district names
+nationally would confuse the Aurangabad in Maharashtra with the one in Bihar —
+and a choropleth that colours the wrong district is worse than no map, because
+it still looks authoritative.
+
+State is recovered geometrically instead: the ADM1 state layer is acquired, and
+each district polygon's **representative point** is spatially joined into it.
+`representative_point()` rather than `centroid()` deliberately — a centroid can
+fall outside a concave or multipart shape, which for coastal and island
+districts silently assigns the wrong state. Name matching is then restricted
+within state, with the Phase 1 directional guard still applying. Result: 93.1%
+of polygons matched, 96.9% of districts covered.
+
+**2. Two polygons claimed the same district.** The 1:1 guard caught it and the
+run failed rather than shipping. Only the best-scoring polygon now keeps a
+district; the runner-up is released with the reason recorded. Colouring two
+polygons from one district's score would have overstated its footprint on the
+map.
+
+**3. The app could not be deployed.** It read live Postgres, which no cloud
+host has. Rather than maintain two apps, `src/datasource.py` tries Postgres
+first and falls back to an exported snapshot — parquet tables plus a geojson
+trimmed from 8 MB to about 2 MB by keeping only matched polygons and
+simplifying the geometry.
+
+The app **displays which source answered**. A dashboard that silently serves
+stale files while looking live is precisely the thing that destroys trust in an
+analysis, and the fix costs one line.
+
+`requirements-app.txt` exists for the same reason: the deployed app never
+imports geopandas, fiona or psycopg2, so dropping them removes the GDAL system
+dependency that is the usual cause of a failed cloud build.
+
+---
+
+## Phase 6 — documentation and deliverables
+
+**Built.** `README.md`, `docs/DEPLOY.md`, `reports/recommendation_memo.md`,
+`docs/Project_Report.pdf` (10 pages, recruiter-facing) and
+`docs/Project_Deck.pptx` (12 slides).
+
+### Challenges
+
+**1. ReportLab does not wrap text in table cells.** Long strings ran straight
+off the page edge — invisible in the code, obvious in the render. Every cell is
+now wrapped in a `Paragraph`, which is the only flowable that reflows to the
+column width. Caught by rendering the PDF to images and *looking* at it, which
+is the only reliable check.
+
+**2. Three near-blank pages** from manual page breaks that fired after short
+sections. Removed the manual breaks and let content flow, keeping
+`KeepTogether` only where a block genuinely must not split. 13 pages became 10,
+with no widows.
+
+**3. A table drawn twice.** In the deck, a header rectangle was drawn over a
+table and then the table redrawn on top, leaving white header text on a white
+fill — invisible. Fixed by styling the header cells directly instead of
+painting a shape behind them.
+
+All three were caught by rendering to images and inspecting them. None would
+have been caught by reading the generating code, which is the point.
