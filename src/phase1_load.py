@@ -53,6 +53,22 @@ def build_indicator_catalogue(nfhs: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     return cat, int(nfhs.indicator_id.isna().sum())
 
 
+def classify_terrain(d: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+    """IPHS 2022 terrain class and catchment norm, per district.
+
+    Waterfall: hill state -> hilly; else ST share above threshold -> tribal;
+    else plains. Desert is never assigned — identifying desert blocks needs
+    sub-district terrain data we do not have. See config/iphs_norms.yml.
+    """
+    cfg = load_yaml("iphs_norms.yml")
+    hills, thresh = set(cfg["hill_states"]), cfg["tribal_st_share_threshold"]
+    terrain = pd.Series("plains", index=d.index)
+    terrain[d.st_share.fillna(0) >= thresh] = "tribal"
+    terrain[d.nfhs_state.isin(hills)] = "hilly"
+    norm = terrain.map(lambda t: cfg["catchment"][t]).astype(int)
+    return terrain, norm
+
+
 def main() -> int:
     print("=== Phase 1b: schema + load ===")
     xw_path = DATA_INTERIM / "crosswalk.csv"
@@ -75,9 +91,9 @@ def main() -> int:
         "District code": "census_code", "State name": "census_state",
         "District name": "census_district", "Population": "population",
         "Rural_Households": "rural_hh", "Urban_Households": "urban_hh",
-        "Households": "total_hh"})
+        "Households": "total_hh", "ST": "st_population"})
     cen[["census_code", "census_state", "census_district", "population",
-         "rural_hh", "urban_hh", "total_hh"]].to_sql(
+         "rural_hh", "urban_hh", "total_hh", "st_population"]].to_sql(
         "census2011_raw", eng, schema="staging", if_exists="append", index=False)
     print(f"  staging.nfhs5_raw       {len(nfhs):,}")
     print(f"  staging.census2011_raw  {len(cen):,}")
@@ -93,12 +109,14 @@ def main() -> int:
     xw = pd.read_csv(xw_path)
     cols = ["nfhs_state", "nfhs_district", "region", "census_code", "census_state",
             "census_district", "match_score", "is_apportioned", "n_sharing_parent",
-            "population_alloc", "rural_share", "rural_population"]
+            "population_alloc", "rural_share", "rural_population", "st_share"]
     d = xw.rename(columns={"tier": "match_tier"})[["match_tier"] + cols].copy()
     d["n_sharing_parent"] = d.n_sharing_parent.replace(0, 1)
     d["is_apportioned"] = d.n_sharing_parent > 1
+    d["terrain"], d["catchment_norm"] = classify_terrain(d)
     d.to_sql("district", eng, schema="core", if_exists="append", index=False)
-    print(f"  core.district           {len(d):,}")
+    print(f"  core.district           {len(d):,}  "
+          + ", ".join(f"{k}={v}" for k, v in d.terrain.value_counts().items()))
 
     # --- core.district_indicator -------------------------------------------
     with eng.connect() as cx:
@@ -121,6 +139,21 @@ def main() -> int:
                       for s, spec in schemes.items() for k, v in spec["weights"].items()])
     w.to_sql("weight_scheme", eng, schema="core", if_exists="append", index=False)
     print(f"  core.weight_scheme      {len(w):,}  ({w.scheme.nunique()} schemes)")
+
+    # --- core.param ---------------------------------------------------------
+    icfg = load_yaml("indicators.yml")
+    ncfg = load_yaml("iphs_norms.yml")
+    params = [
+        ("min_indicators_present", icfg["missingness"]["min_indicators_present"],
+         "Minimum index indicators a district must have to be scored"),
+        ("tribal_st_share_threshold", ncfg["tribal_st_share_threshold"],
+         "Census ST population share at or above which a district is classed tribal"),
+        ("catchment_plains", ncfg["catchment"]["plains"], "IPHS 2022 Sub-Centre norm, plains"),
+        ("catchment_hilly", ncfg["catchment"]["hilly"], "IPHS 2022 Sub-Centre norm, hilly/tribal/desert"),
+    ]
+    pd.DataFrame(params, columns=["key", "value", "note"]).to_sql(
+        "param", eng, schema="core", if_exists="append", index=False)
+    print(f"  core.param              {len(params):,}")
 
     # --- audit --------------------------------------------------------------
     if MANIFEST.exists():

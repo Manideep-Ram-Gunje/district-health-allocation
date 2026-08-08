@@ -1,4 +1,4 @@
-.PHONY: help venv db-up db-down db-logs db-create psql data reconcile load phase2 phase3 phase4 app test clean-db reset
+.PHONY: help venv db-up db-down db-logs db-create psql data reconcile load analytics allocate sensitivity app test clean-db reset all
 .DEFAULT_GOAL := help
 
 PY := .venv/bin/python
@@ -45,6 +45,9 @@ reconcile:  ## Phase 1a — build the district crosswalk
 
 load:  ## Phase 1b — build schema and load the database
 	$(PY) -m src.phase1_load
+
+analytics:  ## Phase 2 — build the Need Index and analytics views
+	$(PY) -m src.phase2_need_index
 
 test:  ## Run the test suite
 	$(PY) -m pytest

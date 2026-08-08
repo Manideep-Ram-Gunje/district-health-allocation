@@ -235,3 +235,109 @@ Population is conserved to seven people across 118 apportioned districts. If
 the split logic were double-counting or dropping population, this number would
 be in the millions. It is asserted in `tests/test_load.py` so it cannot
 regress silently.
+
+---
+
+## Phase 2 — SQL analytics layer and the Composite Need Index
+
+**Built.** A chain of materialised views (`sql/02_analytics.sql`), the Phase 2
+driver (`src/phase2_need_index.py`), IPHS terrain classification, 10 more
+tests. 696 districts scored under 3 weighting schemes.
+
+The index is deliberately built as a *chain* rather than one query, so every
+intermediate stage can be selected from and defended:
+
+```
+mv_indicator_score       direction-normalised raw values
+mv_indicator_percentile  percentile rank in the national distribution
+mv_need_index            weighted composite, per scheme
+mv_district_score        need + population + IPHS coverage terms
+mv_peer_benchmark        district vs its state and region
+v_supply_degeneracy      executable proof of a methodological finding
+```
+
+### Why percentile-rank rather than z-score or min-max
+
+Raw indicator values are not comparable. Institutional births spans roughly
+20-100; stunting spans 6-60. Averaging raw values silently lets the
+widest-spread indicator dominate — the weight vector would say the indicators
+are equal while the arithmetic disagreed. Percentile ranking puts all seven on
+an identical 0-1 scale, so the weights are the *only* thing determining
+influence. That is also what makes the Phase 4 sensitivity analysis meaningful:
+perturbing the weights perturbs exactly one thing.
+
+### Challenges
+
+**1. `percent_rank()` returns double precision, and Postgres has no
+two-argument `round()` for doubles.** The build failed with
+`function round(double precision, integer) does not exist`. The lazy fix is to
+cast at each call site. The right fix is to cast once, at the source, so the
+whole downstream chain is exact decimal arithmetic — which also makes the need
+index bit-for-bit reproducible across machines rather than subject to binary
+floating-point drift.
+
+**2. Terrain had to be derived, not assumed.** IPHS sets the Sub-Centre
+catchment at 5,000 in plains and 3,000 in hilly, tribal *or desert* areas —
+the spec quoted "hilly and tribal" and dropped desert, which was caught by
+checking the published standard (IPHS 2022 Volume IV) rather than quoting from
+memory. Hill states come from a config list; tribal status is computed from
+**Census ST population share >= 50%**, a measured quantity rather than a guess.
+Result: 543 plains, 118 hilly, 44 tribal. The tribal set is face-valid — The
+Dangs 94.7% ST, Alirajpur 89.0%, Jhabua 87.0%.
+
+Desert is never assigned, and ST share is computed on total rather than rural
+population. Both errors under-apply the 3,000 norm, i.e. both are conservative.
+Documented in `config/iphs_norms.yml`.
+
+**3. Nine districts are correctly unscoreable.** 705 districts, 696 scored. The
+nine dropped are Mumbai, Mumbai Suburban, Chennai, Kolkata, Hyderabad, Delhi
+Central, New Delhi, Mahe and Yanam — every one has *zero* rural population. A
+rural Sub-Centre cannot be sited where there is no rural population, so this is
+the scope boundary in the spec asserting itself, not a data failure. A test
+pins it: the excluded set must contain only zero-rural districts.
+
+### The main finding: the supply adjustment cancels
+
+Spec section 6.3 defines underservice as population at risk divided by existing
+facilities, falling back to *norm-implied* facilities where counts are
+unavailable. Counts are unavailable (Phase 0). Substituting the fallback:
+
+```
+underservice = (need x rural_pop) / (rural_pop / norm)
+             =  need x norm
+```
+
+The population term cancels **exactly**. A supply-adjusted underservice score
+would be the need index times a terrain constant — carrying zero information
+about existing infrastructure while appearing to account for it. It would also
+rank districts almost identically to the raw need index, so the error would
+never show up as a suspicious-looking output.
+
+`core.v_supply_degeneracy` proves this on the real data rather than asserting
+it: `ratio_check` is 1.0 for all 696 districts, and a test enforces it.
+
+**Consequence.** No supply-adjusted score is shipped. Supply enters only
+through the terrain-specific catchment norm in `coverage_gain`. Volunteering
+this is stronger than shipping a formula that cancels.
+
+### Face validity
+
+The top of the ranking was not tuned toward any expected answer, and it lands
+on exactly the districts an Indian public health researcher would name: Araria,
+Purnia, Sitamarhi, Katihar and Kishanganj (Bihar's Seemanchal region), and
+Pakur, Sahibganj and Deoghar (Jharkhand's Santhal Pargana). These are among the
+most deprived districts in the country. The index found them from seven NFHS
+indicators without being told anything about geography.
+
+### First look at weight sensitivity
+
+Top-25 overlap between weighting schemes, out of 25:
+
+| Scheme A | Scheme B | Shared |
+|---|---|---|
+| `equal_per_domain` | `equal_per_indicator` | 18 |
+| `equal_per_domain` | `maternal_priority` | 17 |
+| `equal_per_indicator` | `maternal_priority` | 22 |
+
+Substantial but not total agreement — which is the honest answer, and sets up
+Phase 4 to quantify it properly across 10,000 sampled weight vectors.

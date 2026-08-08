@@ -43,7 +43,8 @@ CREATE TABLE staging.census2011_raw (
     population       bigint,
     rural_hh         bigint,
     urban_hh         bigint,
-    total_hh         bigint
+    total_hh         bigint,
+    st_population    bigint
 );
 
 -- ---------------------------------------------------------------------------
@@ -92,7 +93,15 @@ CREATE TABLE core.district (
     population_alloc   bigint,
     rural_share        numeric(6,4),
     rural_population   bigint,
+    st_share           numeric(6,4),
+    terrain            text NOT NULL,
+    catchment_norm     integer NOT NULL,
     UNIQUE (nfhs_state, nfhs_district),
+    CONSTRAINT terrain_is_known CHECK (terrain IN ('plains','hilly','tribal','desert')),
+    CONSTRAINT catchment_matches_terrain CHECK (
+        (terrain = 'plains' AND catchment_norm = 5000)
+        OR (terrain <> 'plains' AND catchment_norm = 3000)
+    ),
     CONSTRAINT rural_not_exceeding_total CHECK (
         rural_population IS NULL OR population_alloc IS NULL
         OR rural_population <= population_alloc
@@ -108,6 +117,10 @@ COMMENT ON COLUMN core.district.is_apportioned IS
     'True where several NFHS-5 districts share one Census 2011 parent (a post-2011 split). Parent population is divided equally among children.';
 COMMENT ON COLUMN core.district.region IS
     'Zonal Council grouping. Drives the minimum-one-facility-per-region equity constraint in Phase 3.';
+COMMENT ON COLUMN core.district.terrain IS
+    'IPHS 2022 terrain class. hilly from the state list, tribal from Census ST share >= 50%, else plains. Desert is never assigned — see config/iphs_norms.yml limitations.';
+COMMENT ON COLUMN core.district.catchment_norm IS
+    'People one Sub-Centre is expected to serve: 5000 plains, 3000 hilly/tribal/desert. IPHS 2022 Volume IV.';
 
 CREATE INDEX district_state_idx  ON core.district (nfhs_state);
 CREATE INDEX district_region_idx ON core.district (region);
@@ -142,6 +155,19 @@ CREATE TABLE core.weight_scheme (
     indicator_key  text NOT NULL REFERENCES core.indicator(indicator_key),
     weight         numeric(9,6) NOT NULL CHECK (weight >= 0),
     PRIMARY KEY (scheme, indicator_key)
+);
+
+-- ---------------------------------------------------------------------------
+-- core.param — scalar methodology parameters, sourced from YAML at load time
+--
+-- Exists so the SQL layer never hardcodes a number that lives in config. If
+-- the missingness floor changes in config/indicators.yml, the views follow.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE core.param (
+    key    text PRIMARY KEY,
+    value  numeric NOT NULL,
+    note   text
 );
 
 -- ---------------------------------------------------------------------------

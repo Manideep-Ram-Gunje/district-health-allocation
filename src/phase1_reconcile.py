@@ -83,9 +83,9 @@ def load_inputs():
         "District code": "census_code", "State name": "census_state",
         "District name": "census_district", "Population": "population",
         "Rural_Households": "rural_hh", "Urban_Households": "urban_hh",
-        "Households": "total_hh",
-    })[["census_code", "census_state", "census_district",
-        "population", "rural_hh", "urban_hh", "total_hh"]]
+        "Households": "total_hh", "ST": "st_population",
+    })[["census_code", "census_state", "census_district", "population",
+        "rural_hh", "urban_hh", "total_hh", "st_population"]]
     cen["norm"] = cen["census_district"].map(norm)
     return nfhs, cen
 
@@ -159,7 +159,7 @@ def reconcile() -> pd.DataFrame:
     df["is_apportioned"] = df.get("n_sharing_parent", pd.Series(dtype=float)).gt(1).fillna(False)
 
     cen_idx = load_inputs()[1].set_index("census_code")
-    for col in ("population", "rural_hh", "total_hh"):
+    for col in ("population", "rural_hh", "total_hh", "st_population"):
         df[col] = df["census_code"].map(cen_idx[col])
     df["n_sharing_parent"] = df["n_sharing_parent"].fillna(0).astype(int)
 
@@ -171,6 +171,11 @@ def reconcile() -> pd.DataFrame:
     hh_share = (df["rural_hh"] / df["total_hh"]).clip(0, 1)
     df["rural_share"] = hh_share.round(4)
     df["rural_population"] = (df["population_alloc"] * hh_share).round().astype("Int64")
+
+    # Scheduled Tribe share drives the IPHS tribal catchment norm (3,000 rather
+    # than 5,000). Apportionment cancels in the ratio, so this is unaffected by
+    # how a split parent's population was divided.
+    df["st_share"] = (df["st_population"] / df["population"]).clip(0, 1).round(4)
     return df
 
 
