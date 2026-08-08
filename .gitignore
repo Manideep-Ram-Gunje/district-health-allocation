@@ -23,6 +23,19 @@ data/processed/*.csv
 .env
 *.pgpass
 
+# SSH keys and tokens. ssh-keygen writes to the CURRENT directory when you type
+# a bare filename at its prompt, which is very easy to do while sitting inside
+# a repo — and a committed private key is a public one.
+id_rsa
+id_ed25519
+id_ecdsa
+*.pem
+*.key
+*_rsa
+*_ed25519
+!*.pub
+.netrc
+
 # ---- python ----
 __pycache__/
 *.py[cod]
