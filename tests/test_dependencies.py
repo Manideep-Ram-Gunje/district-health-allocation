@@ -48,15 +48,52 @@ IMPLICIT = {
 }
 
 
+REQUIREMENTS_FILES = ["requirements.txt", "requirements-pipeline.txt"]
+
+
 def declared() -> set[str]:
-    txt = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+    """Every package declared across ALL requirements files.
+
+    Dependencies are split deliberately: `requirements.txt` is the small set a
+    DEPLOYMENT installs (Streamlit Cloud reads that filename and offers no way
+    to point elsewhere), while `requirements-pipeline.txt` adds the heavy
+    pipeline-only packages — geopandas, psycopg2, scikit-learn, pytest.
+
+    Checking only the root file would report every pipeline import as
+    undeclared, which is exactly what happened when the split was introduced.
+    """
     out = set()
-    for line in txt.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
+    for fname in REQUIREMENTS_FILES:
+        path = ROOT / fname
+        if not path.exists():
             continue
-        out.add(re.split(r"[=<>!\[;]", line)[0].strip().lower())
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or line.startswith("-r"):
+                continue
+            out.add(re.split(r"[=<>!\[;]", line)[0].strip().lower())
     return out
+
+
+def test_deployment_requirements_stay_lean():
+    """The root file must NOT contain the geospatial or database stack.
+
+    Streamlit Cloud installs requirements.txt and nothing else. geopandas and
+    fiona pull in GDAL system libraries, which is the most common cause of a
+    failed cloud build — and the deployed app never imports them, because it
+    reads the pre-simplified snapshot geojson as plain JSON.
+    """
+    root = set()
+    for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and not line.startswith("-r"):
+            root.add(re.split(r"[=<>!\[;]", line)[0].strip().lower())
+    forbidden = {"geopandas", "fiona", "psycopg2-binary", "psycopg2",
+                 "scikit-learn", "gdal"}
+    leaked = root & forbidden
+    assert not leaked, (
+        f"{sorted(leaked)} must live in requirements-pipeline.txt, not the root "
+        "file — they break the Streamlit Cloud build and the app never uses them")
 
 
 def source_files() -> list[Path]:
