@@ -1,0 +1,152 @@
+# ---------------------------------------------------------------------------
+# Composite Need Index specification.
+#
+# KEYING: NFHS-5 indicator names carry embedded footnote markers that differ
+# between factsheets (e.g. "Births attended by skilled health personnel10 (%)").
+# String matching on those names is brittle. Every factsheet row is numbered
+# 1-104 and that numbering is stable across all districts, so we key on the
+# leading INTEGER and keep `name_as_published` for documentation only.
+#
+# DIRECTION: `higher_is_worse: true`  -> value used as-is
+#            `higher_is_worse: false` -> value inverted (100 - v) before ranking
+# so that after normalisation, higher ALWAYS means greater need.
+# ---------------------------------------------------------------------------
+
+indicators:
+
+  - id: 33
+    key: anc_4plus_visits
+    name_as_published: "33. Mothers who had at least 4 antenatal care visits (%)"
+    domain: maternal
+    higher_is_worse: false
+    rationale: "Antenatal contact is the entry point to the public system; low ANC4+ signals weak outreach."
+
+  - id: 38
+    key: pnc_within_2_days
+    name_as_published: "38. Mothers who received postnatal care from a doctor/nurse/LHV/ANM/midwife/other health personnel within 2 days of delivery (%)"
+    domain: maternal
+    higher_is_worse: false
+    rationale: "The 48-hour window carries the largest share of maternal and neonatal mortality risk."
+
+  - id: 42
+    key: institutional_births
+    name_as_published: "42. Institutional births (%)"
+    domain: maternal
+    higher_is_worse: false
+    rationale: "Headline access measure and the indicator State Health Societies are held to."
+
+  - id: 45
+    key: skilled_birth_attendance
+    name_as_published: "45. Births attended by skilled health personnel10 (%)"
+    domain: maternal
+    higher_is_worse: false
+    rationale: "Captures quality of attendance, including births outside institutions."
+
+  - id: 49
+    key: child_fully_vaccinated
+    name_as_published: "49. Children age 12-23 months fully vaccinated based on information from either vaccination card or mother's recall11 (%)"
+    domain: child
+    higher_is_worse: false
+    rationale: "Full immunisation requires repeated successful contact — a good proxy for sustained service reach."
+
+  - id: 73
+    key: child_stunting
+    name_as_published: "73. Children under 5 years who are stunted (height-for-age)18 (%)"
+    domain: nutrition
+    higher_is_worse: true
+    rationale: "Chronic undernutrition; a cumulative outcome rather than a point-in-time service measure."
+
+  - id: 84
+    key: women_anaemia
+    name_as_published: "84. All women age 15-49 years who are anaemic22 (%)"
+    domain: nutrition
+    higher_is_worse: true
+    rationale: "Directly addressable by Sub-Centre-level IFA supplementation and screening."
+
+# ---------------------------------------------------------------------------
+# Weighting schemes.
+#
+# `default_scheme` is what the pipeline uses. Section 6.5 of the spec exists
+# precisely because this choice is a value judgement, not a finding — the
+# Dirichlet sensitivity analysis in Phase 4 tests how much it matters.
+# ---------------------------------------------------------------------------
+
+default_scheme: equal_per_indicator
+
+weighting_schemes:
+
+  equal_per_indicator:
+    description: >
+      Every indicator gets 1/7. Chosen as the default because the indicator
+      set is not balanced across domains (4 maternal, 1 child, 2 nutrition),
+      so equal DOMAIN weighting would load a full third of the index onto a
+      single immunisation variable. Stating this trade-off is more defensible
+      than quietly picking one.
+    weights:
+      anc_4plus_visits: 0.142857
+      pnc_within_2_days: 0.142857
+      institutional_births: 0.142857
+      skilled_birth_attendance: 0.142857
+      child_fully_vaccinated: 0.142857
+      child_stunting: 0.142857
+      women_anaemia: 0.142858     # absorbs rounding so the vector sums to exactly 1
+
+  equal_per_domain:
+    description: >
+      Each of the three domains gets 1/3, split evenly within the domain.
+      This is the scheme implied by spec section 9.5. Retained so the two can
+      be compared directly in the Streamlit app.
+    weights:
+      anc_4plus_visits: 0.083333
+      pnc_within_2_days: 0.083333
+      institutional_births: 0.083333
+      skilled_birth_attendance: 0.083333
+      child_fully_vaccinated: 0.333333
+      child_stunting: 0.166667
+      women_anaemia: 0.166668
+
+  maternal_priority:
+    description: >
+      Illustrative advocacy scheme — 60% maternal, 20% child, 20% nutrition.
+      Included to show how far the top-25 list moves under a defensible but
+      different policy stance.
+    weights:
+      anc_4plus_visits: 0.15
+      pnc_within_2_days: 0.15
+      institutional_births: 0.15
+      skilled_birth_attendance: 0.15
+      child_fully_vaccinated: 0.20
+      child_stunting: 0.10
+      women_anaemia: 0.10
+
+# ---------------------------------------------------------------------------
+# Missingness policy
+# ---------------------------------------------------------------------------
+missingness:
+  # A district must have at least this many of the 7 indicators present to be
+  # scored at all. Districts below the floor are reported as UNSCORED rather
+  # than silently imputed to the mean.
+  min_indicators_present: 5
+  # For districts above the floor, the Need Index is the weighted mean over
+  # PRESENT indicators only, with weights renormalised to sum to 1.
+  strategy: renormalise_present_weights
+  # Never impute across districts (no k-NN / PCA fill). An imputed need score
+  # driving a real budget allocation is not defensible under questioning.
+  allow_cross_district_imputation: false
+
+# ---------------------------------------------------------------------------
+# Population derivation (Census 2011 -> rural population at risk)
+# ---------------------------------------------------------------------------
+population:
+  method: household_share
+  formula: "rural_population = Population * (Rural_Households / Households)"
+  assumption: >
+    Mean household size is equal in rural and urban parts of a district. This
+    is known to be slightly wrong — rural households are marginally larger —
+    so rural population is mildly UNDER-estimated. The direction of the bias
+    is conservative for our purpose: it understates rural need rather than
+    inflating it.
+  # Census 2011 is a decade older than NFHS-5. Population is NOT projected
+  # forward; doing so would require a district-level growth assumption we
+  # cannot defend. Stated as limitation 9.1 instead.
+  project_to_survey_year: false

@@ -1,0 +1,32 @@
+# District Health Infrastructure Allocation System
+# Python 3.10+
+
+# --- data ---
+pandas==2.2.2
+numpy==1.26.4
+pyarrow==16.1.0
+
+# --- record linkage ---
+rapidfuzz==3.9.3
+
+# --- database ---
+SQLAlchemy==2.0.31
+psycopg2-binary==2.9.9
+
+# --- optimisation ---
+PuLP==2.8.0
+
+# --- geo + viz ---
+geopandas==0.14.4
+shapely==2.0.4
+plotly==5.22.0
+
+# --- app ---
+streamlit==1.36.0
+
+# --- config + cli ---
+PyYAML==6.0.1
+python-dotenv==1.0.1
+
+# --- tests ---
+pytest==8.2.2

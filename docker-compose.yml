@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:15
+    container_name: dhia_pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PGUSER:-dhia}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-dhia}
+      POSTGRES_DB: ${PGDATABASE:-dhia}
+    # 5433 on the host so we never collide with a system postgres on 5432.
+    ports:
+      - "${PGPORT:-5433}:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-dhia} -d ${PGDATABASE:-dhia}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

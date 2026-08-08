@@ -1,0 +1,96 @@
+# ---------------------------------------------------------------------------
+# Data source registry.
+#
+# Every external input is declared here — nothing is downloaded by a URL
+# hardcoded in a script. `src/phase0_acquire.py` reads this file, downloads
+# each source, records a SHA-256 in data/raw/MANIFEST.json, and runs the
+# declared verification checks.
+#
+# Pinned URLs (commit SHAs / immutable paths) are used wherever possible so
+# that a rebuild six months from now produces the same bytes.
+# ---------------------------------------------------------------------------
+
+sources:
+
+  nfhs5_districts:
+    description: >
+      NFHS-5 (2019-21) district factsheets, parsed from the official PDF
+      compendium into long format. Sourced from the Phase 2 District
+      Factsheets, which cover all States and UTs (HP/Kangra, HP/Chamba and
+      MH/Dhule come from the Phase 1 release).
+    url: https://raw.githubusercontent.com/jvargh7/nfhs5_factsheets/main/data%20for%20analysis/districts.csv
+    filename: nfhs5_districts.csv
+    format: csv
+    licence: MIT
+    provenance: https://github.com/jvargh7/nfhs5_factsheets
+    upstream_authority: http://rchiips.org/nfhs/Factsheet_Compendium_NFHS-5.shtml
+    verify:
+      required_columns: [state, district, Indicator, NFHS5, NFHS4]
+      min_rows: 60000          # ~707 districts x 104 indicators
+      min_distinct_districts: 650
+      min_distinct_indicators: 100
+    caveats:
+      - "Third-party PDF extraction. Upstream README warns of possible parse errors."
+      - "'*' (inadequate sample size) and 'na' in the source PDFs are both set to missing here; the distinction is preserved only in the Flag_ columns."
+      - "Footnote markers are embedded in indicator names (e.g. 'skilled health personnel10'), so we key on the leading indicator NUMBER, not the string."
+
+  census2011_districts:
+    description: >
+      Census of India 2011, district-level demographic and household table.
+      Provides total population and rural/urban household counts, from which
+      rural population is derived (see config/indicators.yml -> population).
+    url: https://raw.githubusercontent.com/nishusharma1608/India-Census-2011-Analysis/master/india-districts-census-2011.csv
+    filename: census2011_districts.csv
+    format: csv
+    licence: "Government of India open data (Registrar General & Census Commissioner)"
+    provenance: https://github.com/nishusharma1608/India-Census-2011-Analysis
+    upstream_authority: https://censusindia.gov.in/
+    verify:
+      required_columns:
+        - "District code"
+        - "State name"
+        - "District name"
+        - Population
+        - Rural_Households
+        - Urban_Households
+        - Households
+      exact_rows: 640          # Census 2011 enumerated 640 districts
+    caveats:
+      - "2011 boundaries. NFHS-5 uses 2019-21 boundaries — see the Phase 1 crosswalk."
+      - "No direct rural POPULATION column; only rural HOUSEHOLD counts. Rural population is derived under a stated assumption."
+
+  district_boundaries:
+    description: >
+      geoBoundaries ADM2 (district) polygons for India, 2021 vintage — the
+      closest available match to NFHS-5 district boundaries. Simplified
+      geometry is used to keep the Streamlit choropleth responsive.
+    url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/IND/ADM2/geoBoundaries-IND-ADM2_simplified.geojson
+    filename: india_districts_adm2.geojson
+    format: geojson
+    licence: Open Data Commons Open Database License 1.0
+    provenance: https://www.geoboundaries.org/api/current/gbOpen/IND/ADM2/
+    upstream_authority: "Pathways Data Pvt. Ltd. / lgdirectory.gov.in"
+    verify:
+      min_features: 700        # API reports admUnitCount = 736
+      required_properties: [shapeName, shapeISO]
+    caveats:
+      - "736 units vs NFHS-5's ~707 districts — the crosswalk handles the difference."
+      - "Boundary vintage 2021; source data update Jan 2023."
+
+# ---------------------------------------------------------------------------
+# NOT acquired automatically — see README limitation 9.3
+# ---------------------------------------------------------------------------
+unavailable:
+
+  rural_health_statistics:
+    description: >
+      District-level Sub-Centre / PHC / CHC counts from MoHFW Rural Health
+      Statistics. Published as state-level PDF tables; a district-level
+      machine-readable release could not be located.
+    consequence: >
+      The supply side of the underservice score falls back to STATE-level
+      norm-implied facility counts. This is the project's principal
+      methodological weakness and is stated in the README rather than buried.
+    attempted:
+      - https://main.mohfw.gov.in/
+      - https://data.gov.in/

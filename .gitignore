@@ -1,0 +1,43 @@
+# ---- data ----
+# Raw downloads are reproducible via `make data`; never commit them.
+data/raw/
+data/interim/
+*.zip
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+
+# Processed outputs are regenerable
+data/processed/*.parquet
+data/processed/*.csv
+
+# ---- secrets / env ----
+.env
+*.pgpass
+
+# ---- python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+
+# ---- postgres volume (docker) ----
+pgdata/
+
+# ---- editors / os ----
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# ---- keep the directory structure ----
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+!reports/.gitkeep
