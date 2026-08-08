@@ -164,6 +164,11 @@ with tab_alloc:
         show = (opt[["district_id", "nfhs_state", "nfhs_district", "region", "terrain",
                      "need_index", "national_rank", "rural_population", "is_apportioned"]]
                 .merge(centred, on="district_id", how="left").drop(columns="district_id"))
+        # ilp_stability is a proportion in [0, 1]. Streamlit's ProgressColumn
+        # renders the raw number against the format string, so 1.0 with "%.0f%%"
+        # printed as "1%" rather than "100%" — every district looked maximally
+        # unstable. Convert to a percentage explicitly.
+        show["ilp_stability"] = (show.ilp_stability * 100).round(0)
         st.caption("`ilp_stability` and `classification` come from the stored Phase 4 run "
                    "at the DEFAULT settings. They do not update with the sliders — "
                    "re-running 10,000 draws live would be dishonestly slow.")
@@ -173,7 +178,9 @@ with tab_alloc:
                      "need_index": st.column_config.ProgressColumn(
                          "Need index", min_value=0.0, max_value=1.0, format="%.3f"),
                      "ilp_stability": st.column_config.ProgressColumn(
-                         "Stability", min_value=0.0, max_value=1.0, format="%.0f%%"),
+                         "Stability", min_value=0, max_value=100, format="%.0f%%",
+                         help="Share of 200 re-solved optimisations under sampled "
+                              "weights that still select this district."),
                      "rural_population": st.column_config.NumberColumn(
                          "Rural population", format="%d"),
                      "is_apportioned": st.column_config.CheckboxColumn(
