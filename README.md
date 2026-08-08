@@ -284,7 +284,7 @@ app/          streamlit_app.py
 tests/        82 tests across 8 files
 reports/      seven generated reports — reconciliation, quality, index, allocation, sensitivity, map, residual
 docs/         build-log.md — every phase, every failure, and why each decision was made
-resources/    presentation deliverables — report PDF, slide deck, recommendation memo
+resources/    report PDF, slide deck, memo, and Codebase_Guide.pdf — start there
 data/         raw (checksummed) · interim · processed · snapshot (committed)
 ```
 

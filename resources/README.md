@@ -9,6 +9,7 @@ an input to the pipeline.
 | `Project_Report.pdf` | 10-page written report, large type | Recruiter or interviewer, non-specialist |
 | `Project_Deck.pptx` | 12-slide deck with speaker notes | 10-minute walkthrough |
 | `Recommendation_Memo.md` | One-page policy-style memo | Shows the analysis translated into a decision |
+| `Codebase_Guide.pdf` | 6-page guide: how to run, read and explain the repo | **Read this first** if you are new to the code |
 
 ## Where the numbers come from
 
