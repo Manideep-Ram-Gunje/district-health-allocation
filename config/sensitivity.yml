@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------------------
+# Weight sensitivity analysis.
+#
+# The weight vector is the least defensible choice in the methodology. It
+# encodes a value judgement — whether child stunting matters as much as
+# institutional births — and no amount of data settles it. So rather than
+# defend one vector, we measure how much the answer depends on it.
+#
+# Two regimes, because "how sensitive is it?" has two different honest answers
+# depending on how sceptical you are about the weights.
+# ---------------------------------------------------------------------------
+
+draws: 10000
+seed: 42               # fixed, so the published split is reproducible
+top_n: 25              # match the sanctioned budget
+
+regimes:
+
+  uniform:
+    kind: dirichlet_flat
+    alpha: 1.0
+    description: >
+      Uniform over the 7-dimensional simplex: every weight vector summing to 1
+      is equally likely, including lopsided ones putting 80% on a single
+      indicator. Nobody would defend those, which is the point — this is a
+      STRESS TEST. A district surviving it is robust far beyond the range of
+      disagreement it will ever actually face.
+
+  centred:
+    kind: dirichlet_centred
+    concentration: 50
+    description: >
+      Dirichlet centred on the default weight vector with concentration 50.
+      Draws cluster around the chosen weights while still varying meaningfully.
+      This represents PLAUSIBLE COMMITTEE DISAGREEMENT — the range of weightings
+      a room of public health specialists might actually argue over — rather
+      than adversarial extremes.
+
+thresholds:
+  robust: 0.95         # in the selection in more than 95% of draws
+  excluded: 0.05       # in the selection in fewer than 5% of draws
+  # between the two: contested — the districts whose selection genuinely
+  # depends on what you decided to value
+
+ilp_runs: 200
+# ---------------------------------------------------------------------------
+# Two questions, and they are NOT the same question:
+#
+#   rank_stability  does this district stay in the top 25 BY NEED INDEX?
+#                   Ignores the equity constraints entirely.
+#
+#   ilp_stability   does this district stay in the ALLOCATION once the
+#                   4-per-state cap and 1-per-region floor are re-imposed?
+#
+# For a district that was actually allocated, the second is the meaningful one.
+# The constrained optimum deliberately reaches OUTSIDE the national top 25 —
+# it has to, because the cap forbids taking 12 districts from Bihar and the
+# floor requires reaching every region. So a district can be a perfectly sound
+# allocation choice while almost never appearing in the unconstrained top 25.
+#
+# Judging allocated districts by rank_stability alone would mislabel exactly
+# those districts the equity constraints exist to protect.
+# ---------------------------------------------------------------------------

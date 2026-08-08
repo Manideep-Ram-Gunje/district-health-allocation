@@ -59,7 +59,7 @@ SELECT
     (SELECT string_agg(b.nfhs_state || ' (' || b.n || ')', ', ' ORDER BY b.n DESC)
        FROM by_state b
       WHERE b.scenario = p.scenario AND b.scheme = p.scheme
-        AND b.n > (SELECT value FROM core.param WHERE key = 'max_per_state'))
+        AND b.n > core.get_param('max_per_state'))
                                                         AS states_over_cap
 FROM picked p
 GROUP BY p.scenario, p.scheme;

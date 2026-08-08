@@ -52,7 +52,10 @@ analytics:  ## Phase 2 — build the Need Index and analytics views
 allocate:  ## Phase 3 — solve the ILP and compare against baselines
 	$(PY) -m src.phase3_allocate
 
-pipeline: data reconcile load analytics allocate  ## Run every phase end to end
+sensitivity:  ## Phase 4 — Dirichlet weight sensitivity
+	$(PY) -m src.phase4_sensitivity
+
+pipeline: data reconcile load analytics allocate sensitivity  ## Run every phase end to end
 
 test:  ## Run the test suite
 	$(PY) -m pytest

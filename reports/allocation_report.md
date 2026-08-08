@@ -16,12 +16,12 @@ The `min()` in the objective is doing real work. One Sub-Centre cannot serve mor
 
 ## Scenario comparison
 
-| scenario            | scheme              |   facilities |   states_covered |   regions_covered |   total_coverage_gain |   rural_population_in_selected |   hilly_or_tribal_picks |   max_in_any_state | states_over_cap   |
-|:--------------------|:--------------------|-------------:|-----------------:|------------------:|----------------------:|-------------------------------:|------------------------:|-------------------:|:------------------|
-| greedy_feasible     | equal_per_indicator |           25 |               11 |                 6 |                 91350 |                    3.1137e+07  |                       9 |                  4 |                   |
-| naive_top25         | equal_per_indicator |           25 |                7 |                 3 |                101243 |                    4.42926e+07 |                       5 |                 12 |                   |
-| optimal             | equal_per_indicator |           25 |                9 |                 6 |                103285 |                    3.87103e+07 |                       0 |                  4 |                   |
-| unconstrained_bound | equal_per_indicator |           25 |                5 |                 4 |                109084 |                    5.14614e+07 |                       0 |                 13 |                   |
+| scenario            | scheme              |   facilities |   states_covered |   regions_covered |   total_coverage_gain |   rural_population_in_selected |   hilly_or_tribal_picks |   max_in_any_state | states_over_cap               |
+|:--------------------|:--------------------|-------------:|-----------------:|------------------:|----------------------:|-------------------------------:|------------------------:|-------------------:|:------------------------------|
+| greedy_feasible     | equal_per_indicator |           25 |               11 |                 6 |                 91350 |                    3.1137e+07  |                       9 |                  4 |                               |
+| naive_top25         | equal_per_indicator |           25 |                7 |                 3 |                101243 |                    4.42926e+07 |                       5 |                 12 | Bihar (12)                    |
+| optimal             | equal_per_indicator |           25 |                9 |                 6 |                103285 |                    3.87103e+07 |                       0 |                  4 |                               |
+| unconstrained_bound | equal_per_indicator |           25 |                5 |                 4 |                109084 |                    5.14614e+07 |                       0 |                 13 | Bihar (13), Uttar Pradesh (6) |
 
 ## The four scenarios, and why there are four
 

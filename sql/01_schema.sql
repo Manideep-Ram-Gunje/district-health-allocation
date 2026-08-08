@@ -170,6 +170,27 @@ CREATE TABLE core.param (
     note   text
 );
 
+-- Always read parameters through this function, never with a bare subquery.
+--
+-- A plain `(SELECT value FROM core.param WHERE key = 'max_per_state')` returns
+-- NULL when the key is absent, and NULL then propagates silently: `n > NULL`
+-- is NULL, so a view checking for constraint violations reports NONE rather
+-- than failing. That exact bug shipped once — an allocation that put 12 of 25
+-- facilities in Bihar was reported as violating nothing, because the database
+-- had been rebuilt without reloading params.
+--
+-- This raises instead. A missing parameter is a broken build, not an empty set.
+CREATE FUNCTION core.get_param(p_key text) RETURNS numeric AS $$
+DECLARE v numeric;
+BEGIN
+    SELECT value INTO v FROM core.param WHERE key = p_key;
+    IF v IS NULL THEN
+        RAISE EXCEPTION 'core.param is missing required key %. Re-run `make load`.', p_key;
+    END IF;
+    RETURN v;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
 -- ---------------------------------------------------------------------------
 -- core.load_audit — provenance for the run that produced this database
 -- ---------------------------------------------------------------------------

@@ -427,3 +427,79 @@ because both failures are instructive:
 Fixed by excluding the file from its own scan and by parsing the **AST**
 instead of pattern-matching source text. A regex over code is a guess about
 syntax; `ast.walk` knows what an import actually is.
+
+---
+
+## Phase 4 — weight sensitivity
+
+**Built.** Dirichlet sampling under two regimes, vectorised index recomputation,
+ILP re-solves, results table and confidence view (`sql/04_sensitivity.sql`),
+`src/phase4_sensitivity.py`, 12 more tests.
+
+### Result
+
+Of the 25 allocated districts:
+
+| Regime | Robust | Contested | Excluded |
+|---|---|---|---|
+| `centred` — plausible committee disagreement | **12** | 13 | 0 |
+| `uniform` — adversarial stress test | 5 | 20 | 0 |
+
+**Zero excluded under either regime** is the reassuring number: the optimiser
+never selects a district that could not be re-selected when the weights move.
+
+### Challenges
+
+**1. A silent NULL nearly shipped a false clean bill of health.** Running the
+pipeline on a second machine, `states_over_cap` reported `None` for *every*
+scenario — including the naive allocation that puts 12 of 25 facilities in
+Bihar. The database had been rebuilt without reloading `core.param`, so
+`(SELECT value FROM core.param WHERE key = 'max_per_state')` returned NULL,
+`n > NULL` evaluated to NULL, and the constraint-violation view reported
+nothing rather than failing.
+
+This is the most dangerous failure mode in the project so far: **the output
+looked correct**. A missing parameter should be a broken build, not an empty
+result set. All parameter reads now go through `core.get_param()`, which
+raises. The bare-subquery pattern is gone from every view.
+
+**2. The first classification was measuring the wrong thing.** The initial run
+labelled 9 of the 25 allocated districts as "excluded" — apparently claiming
+the optimiser had chosen districts that almost never belong in the top 25.
+
+It had, and correctly. Rank stability asks *"is this district in the national
+top 25 by need index?"*, but the ILP chooses under a 4-per-state cap and a
+1-per-region floor, so it **must** reach outside that list — the cap forbids
+taking 12 districts from Bihar and the floor demands every region be served. A
+district can be an entirely sound allocation choice while rarely appearing in
+the unconstrained ranking.
+
+Judging allocated districts by rank stability alone mislabels precisely those
+districts the equity constraints exist to protect. Classification now uses
+`ilp_stability` — the share of re-solved ILPs in which the district is actually
+allocated — and both measures are stored so the difference is inspectable.
+
+**3. Uniform Dirichlet is a stress test, not a sensitivity analysis.**
+`alpha = 1` is uniform over the simplex, so a single draw can put 80% of the
+weight on one indicator. No committee would defend that. Reporting only this
+regime overstates fragility: it answers "what if the weights were chosen
+adversarially?" rather than "what if reasonable people disagreed?"
+
+Both regimes now run. `centred` samples Dirichlet around the default vector
+with concentration 50 — realistic disagreement. `uniform` remains as the
+adversarial bound. The two numbers together (12 robust vs 5) are more
+informative than either alone, and quoting the harsher one alongside the
+realistic one is more credible than quoting only the flattering one.
+
+### Interpretation
+
+The right framing for a defence is not "these are the 25 correct districts".
+It is: **12 of 25 survive any plausible re-weighting, 13 depend on what you
+decided to value, and here is exactly which is which.** The contested list is
+the useful deliverable — it tells a State Health Society where the argument
+actually is.
+
+What sensitivity analysis cannot do: sampling more weight vectors cannot fix a
+biased indicator set. All seven indicators are maternal, child and nutritional.
+There is nothing on communicable disease, mental health or injury, so every
+draw inherits that blind spot.

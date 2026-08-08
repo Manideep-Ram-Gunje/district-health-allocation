@@ -145,8 +145,7 @@ SELECT
     n.need_index * LEAST(d.catchment_norm, d.rural_population)       AS coverage_gain
 FROM core.district d
 JOIN core.mv_need_index n USING (district_id)
-WHERE n.indicators_present >= (SELECT value FROM core.param
-                               WHERE key = 'min_indicators_present')
+WHERE n.indicators_present >= core.get_param('min_indicators_present')
   AND d.rural_population > 0;
 
 CREATE INDEX mv_district_score_idx ON core.mv_district_score (scheme, need_index DESC);
