@@ -32,7 +32,7 @@ data:  ## Phase 0 — download and verify all sources
 	$(PY) -m src.phase0_acquire
 
 test:  ## Run the test suite
-	.venv/bin/pytest -q
+	$(PY) -m pytest
 
 clean-db:  ## DESTROY the postgres volume (irreversible)
 	docker compose down -v

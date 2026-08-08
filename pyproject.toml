@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+# Put the project root on sys.path so `from src.config import ...` resolves.
+#
+# Without this, `pytest` (the console script) fails with ModuleNotFoundError
+# while `python -m pytest` succeeds — because the -m form implicitly prepends
+# the current directory to sys.path and the console script does not. Declaring
+# it here makes both invocations behave identically, for us and for anyone we
+# hand the repo to.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+minversion = "7.0"
