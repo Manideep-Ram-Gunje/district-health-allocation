@@ -6,8 +6,8 @@ an input to the pipeline.
 
 | File | What it is | Audience |
 |---|---|---|
-| `Project_Report.pdf` | 10-page written report, large type | Recruiter or interviewer, non-specialist |
-| `Project_Deck.pptx` | 12-slide deck with speaker notes | 10-minute walkthrough |
+| `Project_Report.pdf` | 11-page written report, large type | Recruiter or interviewer, non-specialist |
+| `Project_Deck.pptx` | 13-slide deck with speaker notes | 10-minute walkthrough |
 | `Recommendation_Memo.md` | One-page policy-style memo | Shows the analysis translated into a decision |
 | `Codebase_Guide.pdf` | 6-page guide: how to run, read and explain the repo | **Read this first** if you are new to the code |
 
@@ -23,6 +23,9 @@ make test        # 82 tests
 
 The authoritative sources are `reports/` (six generated reports) and
 `docs/build-log.md` (the full build record, including every failure).
+
+All four documents are current as of Phase 7 (the socioeconomic residual model)
+and quote the same figures as `reports/`.
 
 ## Keeping them current
 

@@ -13,6 +13,22 @@ weightings.
 > recommendation** and should never be presented as one. Its principal
 > limitations are listed in [Limitations](#limitations), not buried at the end.
 
+
+## Documentation
+
+| Start here | For |
+|---|---|
+| [`resources/Codebase_Guide.pdf`](resources/Codebase_Guide.pdf) | **New to the project.** How to run, read and explain it. 6 pages, 15 minutes |
+| [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | Using the dashboard. No coding |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Technical reference — schema, data flow, modules, tests |
+| [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) | Every table, column and derived metric |
+| [`docs/build-log.md`](docs/build-log.md) | What broke and why each decision was made. The most useful file here |
+| [`docs/INTERVIEW_PREP.md`](docs/INTERVIEW_PREP.md) | The five questions this project attracts, answered |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Local and Streamlit Cloud deployment |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Setup, rules, how to add a phase |
+| [`resources/`](resources/) | Report PDF, slide deck, recommendation memo |
+| [`reports/`](reports/) | Seven generated reports — regenerate, never edit |
+
 ---
 
 ## The headline result
@@ -39,7 +55,7 @@ value, and here is exactly which is which.*
 
 ---
 
-## Three findings worth reading
+## Four findings worth reading
 
 ### 1. The supply adjustment cancels algebraically
 
@@ -103,8 +119,6 @@ wherever it stands. Both objectives are computed and the choice is explicit in
 config, because it is a policy judgement, not a technical one. It moves 9 of the
 25 districts.
 
----
-
 ### 4. Some districts are far sicker than their poverty explains
 
 The Need Index says *how bad* outcomes are. It cannot separate a district that
@@ -136,6 +150,8 @@ surfaces, and that is the point.
 
 The residual is **not** used to drive the allocation. It is a second lens;
 folding it into the objective without a causal argument would be indefensible.
+
+---
 
 ## Quick start
 
@@ -347,7 +363,7 @@ plotly · Streamlit · SQLAlchemy · pytest
 
 ## Licence and attribution
 
-Code released under the MIT Licence. Data licences are recorded per source in
+Code released under the [MIT Licence](LICENSE). Data licences are recorded per source in
 `config/sources.yml` and must be honoured separately.
 
 Authors: _(add names)_
