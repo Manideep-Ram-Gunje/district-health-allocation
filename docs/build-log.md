@@ -503,3 +503,98 @@ What sensitivity analysis cannot do: sampling more weight vectors cannot fix a
 biased indicator set. All seven indicators are maternal, child and nutritional.
 There is nothing on communicable disease, mental health or injury, so every
 draw inherits that blind spot.
+
+---
+
+## Critical review — attacking our own results
+
+Before building the app, the three headline claims were attacked deliberately.
+Two of them did not survive. This section records what broke and what replaced
+it, because the corrected versions are the defensible ones.
+
+### Claim 1 — "optimisation premium of +13%" — WITHDRAWN
+
+The premium was measured against a greedy baseline sorted by the **need
+index**, while the objective being maximised was **coverage gain**. Sorting a
+baseline by the wrong key and then reporting the difference as the value of
+optimisation is a straw man.
+
+Sorted by the objective it is supposed to maximise, greedy scored **exactly the
+ILP optimum** — 103,285 versus 103,285, selecting the identical district set.
+The real premium was **0.00%**.
+
+### Claim 2 — "the model allocates on need" — FALSIFIED, THEN FIXED
+
+The optimal 25 contained **zero hilly and zero tribal districts**, although
+23.3% of candidates are non-plains.
+
+Cause: `coverage_gain = need × min(catchment_norm, rural_population)`, and the
+`min()` binds for only **2 of 696 districts**. So the objective collapsed to
+`need × 5000` in plains and `need × 3000` in hilly or tribal terrain — a hilly
+district needed a 67% higher need index merely to compete.
+
+This **inverts the purpose of the IPHS standard**. The norm is lower in hills
+*because* reaching 3,000 people there takes what reaching 5,000 takes in
+plains. Our objective punished hard terrain for being hard to serve.
+
+Fix: a second objective, `coverage_gain_neutral = need × min(1, rural_pop /
+norm)` — one facility counts as one facility wherever it stands. Now the
+default. Both are computed in SQL and the choice is explicit in
+`config/allocation.yml`, because it is a policy judgement a State Health
+Society is entitled to make differently. Effect: 9 of the 25 districts change,
+and the allocation becomes **16 plains, 5 hilly, 4 tribal**.
+
+### Claim 3 — "greedy is a fair baseline" — BROKEN, THEN FIXED
+
+Sweeping across constraint settings produced an impossible result: at
+`min_per_region >= 2`, greedy scored **higher** than the proven optimum
+(21.197 vs 20.442). A feasible heuristic cannot beat a proven optimum, so one
+of them was wrong.
+
+Greedy was. Its region-repair step performed exactly **one swap per region**,
+so a region needing 3 facilities with 0 selected was "repaired" to 1 and the
+result reported as feasible. The infeasible allocation kept districts it should
+have surrendered, which is why it scored higher.
+
+The repair now loops until every region meets the floor, and `check_feasible()`
+validates every scenario before any comparison is made. Phase 3 exits non-zero
+if a scenario claiming feasibility violates a constraint.
+
+### What Phase 3 is now allowed to claim
+
+Verified across 11 constraint configurations (`tests/test_allocation.py`):
+
+| budget | cap | floor | greedy | ILP | identical set |
+|---|---|---|---|---|---|
+| 25 | 4 | 1 | 21.282 | 21.282 | yes |
+| 25 | 2 | 1 | 20.614 | 20.614 | yes |
+| 25 | 1 | 1 | 18.901 | 18.901 | yes |
+| 25 | 4 | 3 | 20.442 | 20.442 | yes |
+| 25 | 3 | 2 | 20.788 | 20.788 | yes |
+| 10 | 2 | 1 | 8.550 | 8.550 | yes |
+| 50 | 4 | 2 | 40.023 | 40.023 | yes |
+| 60 | 2 | 1 | 40.605 | 40.605 | yes |
+| 25 | 4 | 4 | 19.778 | 19.778 | yes |
+| 30 | 2 | 3 | 23.938 | 23.938 | yes |
+| 40 | 1 | 1 | — | **infeasible** | — |
+
+**A correctly implemented greedy attains the ILP optimum in every feasible
+configuration tested.** That is not a failure of the ILP — it is a property of
+the problem. The objective is linear, the per-state caps form a partition
+matroid, and greedy is optimal on exactly that structure.
+
+So the honest answer to *"what did optimisation buy you over sorting?"* is:
+
+1. **A proof.** Greedy gives an answer; the ILP certifies it cannot be beaten.
+   Without the ILP you would not know that greedy was optimal — and at
+   `min_per_region >= 2` our greedy was silently wrong.
+2. **Infeasibility detection.** 40 facilities at one per state across ~30
+   states is impossible. CBC says so. Greedy returns a plausible-looking list.
+3. **Declarative constraints.** Changing the cap is one line; the greedy repair
+   logic had to be rewritten to handle a floor above 1.
+4. **Robustness to change.** The moment constraints couple districts —
+   adjacency, travel time, shared staffing — the matroid structure is gone and
+   greedy loses its guarantee. The ILP formulation does not change.
+
+Claiming a fabricated premium would have been easier and would not have
+survived the first competent interviewer. This version invites the question.

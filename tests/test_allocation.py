@@ -59,10 +59,43 @@ def test_greedy_baseline_is_also_feasible(alloc):
     assert g.region.nunique() == 6
 
 
-def test_optimal_beats_the_feasible_baseline(alloc):
+def test_optimal_is_at_least_as_good_as_every_feasible_baseline(alloc):
+    """The ILP must never be BEATEN by a heuristic. Matching one is fine.
+
+    Deliberately >= and not >. Greedy sorted by the objective reaches the
+    optimum on this problem — a linear objective under a cardinality limit and
+    per-state caps is close to a matroid, and greedy is strong on those. An
+    earlier version of this test demanded strict improvement, which only passed
+    because the greedy baseline was sorted by the wrong key.
+    """
     opt = scen(alloc, "optimal").coverage_gain.sum()
-    greedy = scen(alloc, "greedy_feasible").coverage_gain.sum()
-    assert opt > greedy, "the ILP failed to beat a greedy heuristic"
+    for name in ("greedy_feasible", "greedy_by_need"):
+        assert opt >= scen(alloc, name).coverage_gain.sum() - 1e-6, f"beaten by {name}"
+
+
+def test_sorting_by_the_objective_never_loses_to_sorting_by_need(alloc):
+    """Sorting by the quantity you maximise can only help.
+
+    Deliberately >=. Under the default terrain-neutral objective, coverage gain
+    is need_index x min(1, rural_pop/norm), which is need_index for all but a
+    handful of districts — so the two sort keys coincide and the scenarios tie.
+    Under coverage_gain_population they diverge sharply. Asserting strict
+    improvement would encode an artefact of one objective choice as a law.
+    """
+    good = scen(alloc, "greedy_feasible").coverage_gain.sum()
+    bad = scen(alloc, "greedy_by_need").coverage_gain.sum()
+    assert good >= bad - 1e-9
+
+
+def test_allocation_is_not_entirely_plains(alloc):
+    """Guards the terrain bias that the population objective introduced.
+
+    With coverage_gain_population, all 25 picks were plains districts although
+    23% of candidates are hilly or tribal — the objective penalised hard terrain
+    for being hard to serve, inverting the intent of the IPHS norm.
+    """
+    t = scen(alloc, "optimal").terrain
+    assert (t != "plains").sum() > 0, "no hilly or tribal district was selected"
 
 
 def test_optimal_never_exceeds_the_unconstrained_ceiling(alloc):
@@ -90,3 +123,64 @@ def test_all_selected_districts_are_scorable(alloc):
     with engine().connect() as c:
         ok = set(pd.read_sql("select district_id from core.mv_district_score", c).district_id)
     assert set(alloc.district_id) <= ok
+
+
+# ---------------------------------------------------------------------------
+# The verification that decides what Phase 3 is allowed to claim.
+# ---------------------------------------------------------------------------
+
+CONFIGS = [(25, 4, 1), (25, 2, 1), (25, 1, 1), (25, 4, 3), (25, 3, 2),
+           (10, 2, 1), (50, 4, 2), (25, 4, 4), (30, 2, 3)]
+
+
+@pytest.fixture(scope="module")
+def candidates():
+    from src.phase3_allocate import load_candidates
+    try:
+        with engine().connect() as c:
+            return load_candidates(c, load_yaml("indicators.yml")["default_scheme"],
+                                   load_yaml("allocation.yml")["objective"])
+    except (OperationalError, ProgrammingError):
+        pytest.skip("analytics layer not built")
+
+
+@pytest.mark.parametrize("budget,cap,floor", CONFIGS)
+def test_greedy_is_always_feasible(candidates, budget, cap, floor):
+    """A heuristic that quietly returns an infeasible answer is worse than none.
+
+    The original region-repair did exactly ONE swap per region, so with
+    min_per_region > 1 it left regions under-served and reported success. The
+    inflated score then BEAT the proven optimum — which is impossible for two
+    feasible solutions, and is how the bug surfaced.
+    """
+    from src.phase3_allocate import check_feasible, greedy_feasible
+    g = greedy_feasible(candidates, budget, cap, floor)
+    v = check_feasible(g, budget, cap, floor, candidates.region.unique())
+    assert not v, f"greedy infeasible at ({budget},{cap},{floor}): {v}"
+
+
+@pytest.mark.parametrize("budget,cap,floor", CONFIGS)
+def test_ilp_is_never_beaten_by_greedy(candidates, budget, cap, floor):
+    """Pins the central claim of Phase 3 across many constraint settings.
+
+    A correctly-implemented greedy attains the ILP optimum on every feasible
+    configuration tested — the objective is linear and the state caps form a
+    partition matroid, which is exactly the structure greedy handles optimally.
+    So the ILP is NOT claimed to find a better answer. It earns its place by
+    PROVING optimality and by detecting infeasibility (budget 40 with a cap of
+    1 per state is impossible, and CBC says so rather than returning a
+    plausible-looking 40 districts).
+    """
+    from src.phase3_allocate import greedy_feasible, solve_ilp
+    g = greedy_feasible(candidates, budget, cap, floor)
+    o, status = solve_ilp(candidates, budget, cap, floor)
+    if status != "Optimal":
+        pytest.skip(f"configuration not solvable: {status}")
+    assert o.coverage_gain.sum() >= g.coverage_gain.sum() - 1e-6
+
+
+def test_solver_detects_a_genuinely_infeasible_configuration(candidates):
+    """40 facilities at most 1 per state, across ~30 states, cannot be done."""
+    from src.phase3_allocate import solve_ilp
+    _, status = solve_ilp(candidates, 40, 1, 1)
+    assert status != "Optimal", "solver accepted an impossible configuration"

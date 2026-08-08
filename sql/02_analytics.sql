@@ -142,7 +142,12 @@ SELECT
     n.indicators_present,
     n.need_index * d.rural_population                                AS population_at_risk,
     ceil(d.rural_population::numeric / d.catchment_norm)             AS required_facilities,
-    n.need_index * LEAST(d.catchment_norm, d.rural_population)       AS coverage_gain
+    -- Two candidate objectives. Which one you choose is a POLICY decision, not
+    -- a technical one, so both are computed and the choice is made explicitly
+    -- in config/allocation.yml rather than baked in here.
+    n.need_index * LEAST(d.catchment_norm, d.rural_population)       AS coverage_gain_population,
+    n.need_index * LEAST(1.0, d.rural_population::numeric / d.catchment_norm)
+                                                                     AS coverage_gain_neutral
 FROM core.district d
 JOIN core.mv_need_index n USING (district_id)
 WHERE n.indicators_present >= core.get_param('min_indicators_present')
@@ -150,8 +155,10 @@ WHERE n.indicators_present >= core.get_param('min_indicators_present')
 
 CREATE INDEX mv_district_score_idx ON core.mv_district_score (scheme, need_index DESC);
 
-COMMENT ON COLUMN core.mv_district_score.coverage_gain IS
-    'Objective coefficient for the Phase 3 ILP: need_index x min(catchment_norm, rural_population).';
+COMMENT ON COLUMN core.mv_district_score.coverage_gain_population IS
+    'need_index x min(catchment_norm, rural_population). Raw population brought within catchment. Systematically favours plains: the cap binds for only 2 of 696 districts, so this reduces to need x 5000 (plains) or need x 3000 (hilly/tribal), a 67% handicap.';
+COMMENT ON COLUMN core.mv_district_score.coverage_gain_neutral IS
+    'need_index x min(1, rural_population / catchment_norm). One facility counts as one facility everywhere. Reads the IPHS norm as the standard intends: 3000 served in hills is EQUIVALENT to 5000 in plains, because that is why the norm is lower.';
 
 -- ---------------------------------------------------------------------------
 -- 5. Peer benchmarking

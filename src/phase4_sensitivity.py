@@ -86,6 +86,19 @@ def sample_weights(regime: dict, keys: list[str], base: dict,
     raise ValueError(f"unknown regime kind: {regime['kind']}")
 
 
+def objective_gain(df: pd.DataFrame, objective: str) -> pd.Series:
+    """Recompute the configured objective from a fresh need index.
+
+    Must match sql/02_analytics.sql exactly, or the sensitivity analysis would
+    be testing a different problem from the one Phase 3 solved.
+    """
+    if objective == "coverage_gain_population":
+        return df.need_index * np.minimum(df.catchment_norm, df.rural_population)
+    if objective == "coverage_gain_neutral":
+        return df.need_index * np.minimum(1.0, df.rural_population / df.catchment_norm)
+    raise ValueError(f"unknown objective: {objective}")
+
+
 def run_regime(name, regime, meta, P, keys, base, cfg, acfg, allocated, rng):
     draws, top_n = cfg["draws"], cfg["top_n"]
     W = sample_weights(regime, keys, base, draws, rng)
@@ -121,8 +134,7 @@ def run_regime(name, regime, meta, P, keys, base, cfg, acfg, allocated, rng):
     solved = 0
     for dr in idx:
         base_df["need_index"] = N[:, dr]
-        base_df["coverage_gain"] = base_df.need_index * np.minimum(
-            base_df.catchment_norm, base_df.rural_population)
+        base_df["coverage_gain"] = objective_gain(base_df, acfg["objective"])
         picked, status = solve_ilp(base_df, budget, cap, floor, time_limit=30)
         if status == "Optimal":
             counter.loc[picked.district_id] += 1

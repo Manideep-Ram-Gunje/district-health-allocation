@@ -81,8 +81,29 @@ def test_supply_adjustment_provably_cancels(cx):
 def test_coverage_gain_never_exceeds_one_facility_catchment(cx):
     """A single Sub-Centre cannot serve more than its catchment norm."""
     n = q(cx, """select count(*) n from core.mv_district_score
-                 where coverage_gain > catchment_norm""").n[0]
+                 where coverage_gain_population > catchment_norm""").n[0]
     assert n == 0
+
+
+def test_neutral_objective_is_a_facility_equivalent(cx):
+    """The terrain-neutral objective is bounded by 1: one facility, one unit."""
+    n = q(cx, """select count(*) n from core.mv_district_score
+                 where coverage_gain_neutral > 1.0""").n[0]
+    assert n == 0
+
+
+def test_the_catchment_cap_almost_never_binds(cx):
+    """Documents WHY the two objectives differ so much.
+
+    Only a handful of districts have rural population below the catchment norm,
+    so coverage_gain_population reduces to need x a terrain constant — giving
+    plains districts a 5000/3000 advantage. This test pins the fact rather than
+    leaving it as a footnote.
+    """
+    r = q(cx, """select count(*) filter (where rural_population < catchment_norm) binds,
+                        count(*) total from core.mv_district_score
+                 where scheme = :s""", s=DEFAULT)
+    assert int(r.binds[0]) < 0.02 * int(r.total[0])
 
 
 def test_population_at_risk_bounded_by_rural_population(cx):

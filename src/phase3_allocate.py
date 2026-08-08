@@ -22,10 +22,19 @@ from sqlalchemy import text
 from src.config import DATA_PROCESSED, REPORTS, SQL_DIR, engine, load_yaml
 
 
-def load_candidates(cx, scheme: str) -> pd.DataFrame:
-    return pd.read_sql(text("""
+def load_candidates(cx, scheme: str, objective: str = "coverage_gain_neutral") -> pd.DataFrame:
+    """Candidate districts with the CONFIGURED objective aliased to coverage_gain.
+
+    Both objectives are materialised in SQL; which one is optimised is a policy
+    choice made in config/allocation.yml, not a hardcoded decision here.
+    """
+    if objective not in ("coverage_gain_population", "coverage_gain_neutral"):
+        raise ValueError(f"unknown objective: {objective}")
+    return pd.read_sql(text(f"""
         select s.district_id, s.nfhs_state, s.nfhs_district, s.region, s.terrain,
-               s.need_index, s.rural_population, s.catchment_norm, s.coverage_gain
+               s.need_index, s.rural_population, s.catchment_norm,
+               s.coverage_gain_population, s.coverage_gain_neutral,
+               s.{objective} as coverage_gain
         from core.mv_district_score s
         where s.scheme = :scheme
         order by s.need_index desc"""), cx, params={"scheme": scheme})
@@ -56,13 +65,18 @@ def unconstrained_bound(c: pd.DataFrame, budget: int, **_) -> pd.DataFrame:
 
 
 def greedy_feasible(c: pd.DataFrame, budget: int, max_per_state: int,
-                    min_per_region: int) -> pd.DataFrame:
+                    min_per_region: int, sort_by: str = "coverage_gain") -> pd.DataFrame:
     """Rank order, honour the state cap, then repair region coverage.
 
-    Deliberately simple — this is the spreadsheet strategy, and it is meant to
-    be beatable. What it cannot do is look ahead: every pick is locally best
-    and permanently committed.
+    `sort_by` is the whole argument of Phase 3. Sorting by `coverage_gain` —
+    the quantity actually being maximised — makes this a STRONG baseline, and
+    for this problem structure it reaches the optimum. Sorting by `need_index`
+    is the mistake an analyst really makes, and costs real coverage.
+
+    Reporting a premium against the need-sorted version alone would be a straw
+    man, so both are run.
     """
+    c = c.sort_values(sort_by, ascending=False)
     picked, per_state = [], {}
     for r in c.itertuples():
         if len(picked) >= budget:
@@ -73,31 +87,66 @@ def greedy_feasible(c: pd.DataFrame, budget: int, max_per_state: int,
         per_state[r.nfhs_state] = per_state.get(r.nfhs_state, 0) + 1
 
     idx = c.set_index("district_id")
+
+    def region_counts() -> dict:
+        s = idx.loc[picked, "region"].value_counts()
+        return {r: int(s.get(r, 0)) for r in c.region.unique()}
+
+    def state_count(state: str, excluding=None) -> int:
+        return sum(1 for d in picked
+                   if d != excluding and idx.loc[d, "nfhs_state"] == state)
+
+    # Repair region coverage. This loops until every region meets the floor —
+    # an earlier version performed exactly ONE swap per region, which silently
+    # produced INFEASIBLE allocations whenever min_per_region > 1: a region
+    # needing 3 with 0 picks was "repaired" to 1 and the result still reported
+    # as feasible. It scored HIGHER than the proven optimum, which is how the
+    # bug was caught — a feasible heuristic cannot beat a proven optimum.
     for region in sorted(c.region.unique()):
-        if sum(idx.loc[picked, "region"] == region) >= min_per_region:
-            continue
-        cands = c[(c.region == region) & (~c.district_id.isin(picked))]
-        if cands.empty:
-            continue
-        add = cands.iloc[0]
-        # Drop the weakest pick whose region can spare it and whose removal
-        # does not push the incoming district's state over the cap.
-        counts = idx.loc[picked, "region"].value_counts()
-        droppable = [d for d in picked
-                     if counts.get(idx.loc[d, "region"], 0) > min_per_region]
-        if not droppable:
-            continue
-        worst = min(droppable, key=lambda d: idx.loc[d, "need_index"])
-        state_n = sum(idx.loc[d, "nfhs_state"] == add.nfhs_state
-                      for d in picked if d != worst)
-        if state_n >= max_per_state:
-            continue
-        picked[picked.index(worst)] = int(add.district_id)
+        while region_counts()[region] < min_per_region:
+            cands = c[(c.region == region) & (~c.district_id.isin(picked))]
+            if cands.empty:
+                break
+            rc = region_counts()
+            droppable = [d for d in picked
+                         if rc[idx.loc[d, "region"]] > min_per_region]
+            if not droppable:
+                break
+            worst = min(droppable, key=lambda d: idx.loc[d, sort_by])
+            # Take the best incoming district whose state still has headroom
+            # once `worst` is removed.
+            add = next((r for r in cands.itertuples()
+                        if state_count(r.nfhs_state, excluding=worst) < max_per_state),
+                       None)
+            if add is None:
+                break
+            picked[picked.index(worst)] = int(add.district_id)
 
     out = c[c.district_id.isin(picked)].copy()
     order = {d: i + 1 for i, d in enumerate(picked)}
     out["pick_rank"] = out.district_id.map(order)
     return out.sort_values("pick_rank")
+
+
+def check_feasible(df: pd.DataFrame, budget: int, max_per_state: int,
+                   min_per_region: int, all_regions) -> list[str]:
+    """Return a list of constraint violations. Empty list means feasible.
+
+    Used to validate heuristics before their scores are compared against the
+    ILP. Comparing against an infeasible baseline produces a meaningless — and
+    flatteringly negative — premium.
+    """
+    v = []
+    if len(df) != budget:
+        v.append(f"budget: {len(df)} selected, expected {budget}")
+    worst = df.nfhs_state.value_counts().max() if len(df) else 0
+    if worst > max_per_state:
+        v.append(f"state cap: {worst} in one state, max {max_per_state}")
+    counts = df.region.value_counts()
+    for r in all_regions:
+        if int(counts.get(r, 0)) < min_per_region:
+            v.append(f"region floor: {r} has {int(counts.get(r, 0))}, min {min_per_region}")
+    return v
 
 
 # --------------------------------------------------------------------------
@@ -133,6 +182,16 @@ def solve_ilp(c: pd.DataFrame, budget: int, max_per_state: int,
 
 # --------------------------------------------------------------------------
 
+def picks_terrain(eng, scheme: str) -> dict:
+    with eng.connect() as cx:
+        t = pd.read_sql(text("""
+            select d.terrain, count(*) n
+            from core.allocation a join core.district d using (district_id)
+            where a.scenario = 'optimal' and a.scheme = :s
+            group by 1 order by 2 desc"""), cx, params={"s": scheme})
+    return dict(zip(t.terrain, t.n))
+
+
 def main() -> int:
     print("=== Phase 3: constrained allocation ===")
     cfg = load_yaml("allocation.yml")
@@ -141,22 +200,46 @@ def main() -> int:
     floor = cfg["constraints"]["min_per_region"]
     scheme = load_yaml("indicators.yml")["default_scheme"]
 
+    objective = cfg["objective"]
     eng = engine()
     with eng.begin() as cx:
         cx.execute(text((SQL_DIR / "03_allocation.sql").read_text(encoding="utf-8")))
 
     with eng.connect() as cx:
-        c = load_candidates(cx, scheme)
+        c = load_candidates(cx, scheme, objective)
     print(f"  candidates: {len(c)} districts, scheme='{scheme}'")
+    print(f"  objective : {objective}")
     print(f"  budget={budget}, max_per_state={cap}, min_per_region={floor}")
 
     results = {
         "naive_top25": naive_top25(c, budget),
         "unconstrained_bound": unconstrained_bound(c, budget),
-        "greedy_feasible": greedy_feasible(c, budget, cap, floor),
+        "greedy_feasible": greedy_feasible(c, budget, cap, floor, sort_by="coverage_gain"),
+        "greedy_by_need": greedy_feasible(c, budget, cap, floor, sort_by="need_index"),
     }
     opt, status = solve_ilp(c, budget, cap, floor, cfg["solver"]["time_limit_seconds"])
     results["optimal"] = opt
+
+    # Validate every scenario that CLAIMS to be feasible. Comparing the optimum
+    # against an infeasible baseline yields a meaningless premium.
+    for name in ("greedy_feasible", "greedy_by_need", "optimal"):
+        v = check_feasible(results[name], budget, cap, floor, c.region.unique())
+        if v:
+            print(f"  [FAIL] {name} violates: {v}")
+            return 1
+
+    # Solve the SAME problem under the other objective, so the report can show
+    # side by side how much the policy choice — not the maths — moves the answer.
+    alt_name = ("coverage_gain_population" if objective == "coverage_gain_neutral"
+                else "coverage_gain_neutral")
+    c_alt = c.copy()
+    c_alt["coverage_gain"] = c_alt[alt_name]
+    alt, alt_status = solve_ilp(c_alt, budget, cap, floor, 60)
+    if alt_status == "Optimal":
+        n_diff = len(set(opt.district_id) ^ set(alt.district_id)) // 2
+        alt_terrain = alt.terrain.value_counts().to_dict()
+        print(f"  alternative objective '{alt_name}': {n_diff} of {budget} districts "
+              f"differ, terrain " + ", ".join(f"{k}={v}" for k, v in alt_terrain.items()))
     print(f"  CBC status: {status}")
     if status != "Optimal":
         print("  [FAIL] solver did not prove optimality")
@@ -191,12 +274,21 @@ def main() -> int:
     g = {r.scenario: float(r.total_coverage_gain) for r in summary.itertuples()}
     m = {
         "premium_vs_greedy": (g["optimal"] - g["greedy_feasible"]) / g["greedy_feasible"],
+        "cost_of_wrong_sort_key": (g["optimal"] - g["greedy_by_need"]) / g["greedy_by_need"],
         "premium_vs_naive": (g["optimal"] - g["naive_top25"]) / g["naive_top25"],
         "price_of_equity": (g["optimal"] - g["unconstrained_bound"]) / g["unconstrained_bound"],
     }
-    print(f"\n  optimisation premium vs greedy_feasible   : {m['premium_vs_greedy']:+.2%}")
-    print(f"  optimisation premium vs naive_top25       : {m['premium_vs_naive']:+.2%}")
+    print(f"\n  vs greedy sorted by the OBJECTIVE (fair)  : {m['premium_vs_greedy']:+.2%}")
+    print(f"  vs greedy sorted by NEED (wrong key)      : {m['cost_of_wrong_sort_key']:+.2%}")
+    print(f"  vs naive top-25 by need (infeasible)      : {m['premium_vs_naive']:+.2%}")
     print(f"  price of equity vs unconstrained ceiling  : {m['price_of_equity']:+.2%}")
+
+    opt_terrain = picks_terrain(eng, scheme)
+    print(f"\n  terrain of the optimal 25: "
+          + ", ".join(f"{k}={v}" for k, v in opt_terrain.items()))
+    if opt_terrain.get("plains", 0) == budget:
+        print("  [WARN] every pick is a plains district — check the objective's "
+              "terrain handling (see config/allocation.yml)")
 
     out = DATA_PROCESSED / "allocation.csv"
     picks.to_csv(out, index=False)
@@ -243,18 +335,28 @@ def write_report(summary, picks, m, cfg, scheme, status, n_cand) -> None:
          "| `optimal` | yes | The integer program, proven optimal by CBC. |", "",
          "## What optimisation actually bought", ""]
 
-    L += [f"- **Premium vs `greedy_feasible`: {m['premium_vs_greedy']:+.2%}.** Both are "
-          "feasible; the ILP finds the better one. Greedy commits to each pick "
-          "permanently in rank order and cannot look ahead, so it spends early picks in "
-          "states where it later needs headroom, then patches regions by evicting "
-          "whichever district happens to be weakest.",
-          f"- **Premium vs `naive_top25`: {m['premium_vs_naive']:+.2%}.** The optimal "
-          "allocation beats the naive one *even though the naive one ignores every "
-          "constraint*. This is the least intuitive number in the project and the most "
-          "worth understanding — see below.",
+    L += [f"- **Premium vs `greedy_feasible`: {m['premium_vs_greedy']:+.2%}.** Greedy, "
+          "sorted by the quantity actually being maximised, is a *strong* baseline for "
+          "this problem — a linear objective under a cardinality limit and per-state "
+          "caps is close to a matroid, and greedy does very well on those. The ILP's "
+          "value here is not a bigger number. It is that it **proves** optimality, and "
+          "expresses the constraints declaratively so they can be changed without "
+          "rewriting the selection logic.",
+          f"- **Cost of sorting on the wrong key: {m['cost_of_wrong_sort_key']:+.2%}.** "
+          "The same greedy heuristic, sorted by the headline *need index* instead of "
+          "the objective, gives up this much. This is the real, defensible finding — "
+          "and it is the mistake an analyst actually makes.",
+          f"- **Premium vs `naive_top25`: {m['premium_vs_naive']:+.2%}** — the "
+          "unconstrained sorted list, which is also inadmissible.",
           f"- **Price of equity: {m['price_of_equity']:+.2%}** against the unconstrained "
-          "ceiling. This is the honest cost of the state cap and the region floor: what "
-          "you give up to get an allocation that can actually be executed.", ""]
+          "ceiling. What you give up to get an allocation that can be executed.", ""]
+
+    L += ["> **Honesty note.** An earlier version of this report claimed a +13% "
+          "\"optimisation premium\". That number came from comparing the ILP against a "
+          "greedy baseline sorted by the *need index* rather than by the objective — a "
+          "straw man. Sorted correctly, greedy reaches the optimum and the premium is "
+          f"{m['premium_vs_greedy']:+.2%}. The 13% is retained above under its accurate "
+          "name: the cost of ranking by the headline metric instead of the objective.", ""]
 
     L += ["### Why sorting loses even before the constraints bite", "",
           "Because the thing you sort on is not the thing you are maximising.", "",

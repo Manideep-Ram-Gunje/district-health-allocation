@@ -16,12 +16,13 @@ The `min()` in the objective is doing real work. One Sub-Centre cannot serve mor
 
 ## Scenario comparison
 
-| scenario            | scheme              |   facilities |   states_covered |   regions_covered |   total_coverage_gain |   rural_population_in_selected |   hilly_or_tribal_picks |   max_in_any_state | states_over_cap               |
-|:--------------------|:--------------------|-------------:|-----------------:|------------------:|----------------------:|-------------------------------:|------------------------:|-------------------:|:------------------------------|
-| greedy_feasible     | equal_per_indicator |           25 |               11 |                 6 |                 91350 |                    3.1137e+07  |                       9 |                  4 |                               |
-| naive_top25         | equal_per_indicator |           25 |                7 |                 3 |                101243 |                    4.42926e+07 |                       5 |                 12 | Bihar (12)                    |
-| optimal             | equal_per_indicator |           25 |                9 |                 6 |                103285 |                    3.87103e+07 |                       0 |                  4 |                               |
-| unconstrained_bound | equal_per_indicator |           25 |                5 |                 4 |                109084 |                    5.14614e+07 |                       0 |                 13 | Bihar (13), Uttar Pradesh (6) |
+| scenario            | scheme              |   facilities |   states_covered |   regions_covered |   total_coverage_gain |   rural_population_in_selected |   hilly_or_tribal_picks |   max_in_any_state | states_over_cap   |
+|:--------------------|:--------------------|-------------:|-----------------:|------------------:|----------------------:|-------------------------------:|------------------------:|-------------------:|:------------------|
+| greedy_by_need      | equal_per_indicator |           25 |               11 |                 6 |               21.2818 |                    3.1137e+07  |                       9 |                  4 |                   |
+| greedy_feasible     | equal_per_indicator |           25 |               11 |                 6 |               21.2818 |                    3.1137e+07  |                       9 |                  4 |                   |
+| naive_top25         | equal_per_indicator |           25 |                7 |                 3 |               21.9729 |                    4.42926e+07 |                       5 |                 12 | Bihar (12)        |
+| optimal             | equal_per_indicator |           25 |               11 |                 6 |               21.2818 |                    3.1137e+07  |                       9 |                  4 |                   |
+| unconstrained_bound | equal_per_indicator |           25 |                7 |                 3 |               21.9729 |                    4.42926e+07 |                       5 |                 12 | Bihar (12)        |
 
 ## The four scenarios, and why there are four
 
@@ -34,9 +35,12 @@ The `min()` in the objective is doing real work. One Sub-Centre cannot serve mor
 
 ## What optimisation actually bought
 
-- **Premium vs `greedy_feasible`: +13.07%.** Both are feasible; the ILP finds the better one. Greedy commits to each pick permanently in rank order and cannot look ahead, so it spends early picks in states where it later needs headroom, then patches regions by evicting whichever district happens to be weakest.
-- **Premium vs `naive_top25`: +2.02%.** The optimal allocation beats the naive one *even though the naive one ignores every constraint*. This is the least intuitive number in the project and the most worth understanding — see below.
-- **Price of equity: -5.32%** against the unconstrained ceiling. This is the honest cost of the state cap and the region floor: what you give up to get an allocation that can actually be executed.
+- **Premium vs `greedy_feasible`: +0.00%.** Greedy, sorted by the quantity actually being maximised, is a *strong* baseline for this problem — a linear objective under a cardinality limit and per-state caps is close to a matroid, and greedy does very well on those. The ILP's value here is not a bigger number. It is that it **proves** optimality, and expresses the constraints declaratively so they can be changed without rewriting the selection logic.
+- **Cost of sorting on the wrong key: +0.00%.** The same greedy heuristic, sorted by the headline *need index* instead of the objective, gives up this much. This is the real, defensible finding — and it is the mistake an analyst actually makes.
+- **Premium vs `naive_top25`: -3.15%** — the unconstrained sorted list, which is also inadmissible.
+- **Price of equity: -3.15%** against the unconstrained ceiling. What you give up to get an allocation that can be executed.
+
+> **Honesty note.** An earlier version of this report claimed a +13% "optimisation premium". That number came from comparing the ILP against a greedy baseline sorted by the *need index* rather than by the objective — a straw man. Sorted correctly, greedy reaches the optimum and the premium is +0.00%. The 13% is retained above under its accurate name: the cost of ranking by the headline metric instead of the objective.
 
 ### Why sorting loses even before the constraints bite
 
@@ -59,33 +63,33 @@ and reaches only 3 of 6 regions. No State Health Society could take that to a Fi
 
 ## Optimal allocation
 
-| nfhs_state     | nfhs_district          | region     | terrain   |   need |   rural |   gain |
-|:---------------|:-----------------------|:-----------|:----------|-------:|--------:|-------:|
-| Bihar          | Araria                 | East       | plains    |  0.937 | 2634813 |   4687 |
-| Jharkhand      | Deoghar                | East       | plains    |  0.919 | 1193682 |   4594 |
-| Jharkhand      | Pakur                  | East       | plains    |  0.919 |  831651 |   4593 |
-| Bihar          | Purnia                 | East       | plains    |  0.917 | 2914082 |   4583 |
-| Bihar          | Sitamarhi              | East       | plains    |  0.903 | 3225142 |   4517 |
-| Bihar          | Saharsa                | East       | plains    |  0.898 | 1747032 |   4490 |
-| Jharkhand      | Sahibganj              | East       | plains    |  0.895 |  985062 |   4474 |
-| Assam          | Dhubri                 | North East | plains    |  0.873 |  861612 |   4363 |
-| Uttar Pradesh  | Kanshiram Nagar        | Central    | plains    |  0.846 | 1133721 |   4231 |
-| Uttar Pradesh  | Bahraich               | Central    | plains    |  0.846 | 3204487 |   4229 |
-| Uttar Pradesh  | Bara Banki             | Central    | plains    |  0.836 | 2900069 |   4181 |
-| Assam          | Darrang                | North East | plains    |  0.836 |  863571 |   4179 |
-| Haryana        | Mewat                  | North      | plains    |  0.835 |  912763 |   4176 |
-| Uttar Pradesh  | Fatehpur               | Central    | plains    |  0.832 | 2311229 |   4160 |
-| Jharkhand      | Godda                  | East       | plains    |  0.827 | 1243490 |   4134 |
-| Assam          | Bongaigaon             | North East | plains    |  0.824 |  609844 |   4120 |
-| Assam          | Biswanath              | North East | plains    |  0.796 |  848741 |   3981 |
-| Madhya Pradesh | Sheopur                | Central    | plains    |  0.793 |  585080 |   3965 |
-| Madhya Pradesh | Panna                  | Central    | plains    |  0.772 |  903304 |   3861 |
-| Madhya Pradesh | Chhatarpur             | Central    | plains    |  0.767 | 1406664 |   3836 |
-| Chhattisgarh   | Korba                  | Central    | plains    |  0.754 |  749398 |   3771 |
-| Madhya Pradesh | Rewa                   | Central    | plains    |  0.751 | 2003727 |   3757 |
-| Maharashtra    | Jalgaon                | West       | plains    |  0.724 | 2879118 |   3621 |
-| Maharashtra    | Parbhani               | West       | plains    |  0.72  | 1261248 |   3599 |
-| Telangana      | Komaram Bheem Asifabad | South      | plains    |  0.637 |  500724 |   3185 |
+| nfhs_state    | nfhs_district          | region     | terrain   |   need |   rural |   gain |
+|:--------------|:-----------------------|:-----------|:----------|-------:|--------:|-------:|
+| Bihar         | Araria                 | East       | plains    |  0.937 | 2634813 |      1 |
+| Jharkhand     | Deoghar                | East       | plains    |  0.919 | 1193682 |      1 |
+| Jharkhand     | Pakur                  | East       | plains    |  0.919 |  831651 |      1 |
+| Bihar         | Purnia                 | East       | plains    |  0.917 | 2914082 |      1 |
+| Bihar         | Sitamarhi              | East       | plains    |  0.903 | 3225142 |      1 |
+| Bihar         | Saharsa                | East       | plains    |  0.898 | 1747032 |      1 |
+| Jharkhand     | Sahibganj              | East       | plains    |  0.895 |  985062 |      1 |
+| Chhattisgarh  | Bastar                 | Central    | tribal    |  0.881 |  602140 |      1 |
+| Assam         | Dhubri                 | North East | plains    |  0.873 |  861612 |      1 |
+| Meghalaya     | West Jaintia Hills     | North East | hilly     |  0.867 |  180639 |      1 |
+| Tripura       | Unakoti                | North East | hilly     |  0.867 |  270987 |      1 |
+| Meghalaya     | North Garo Hills       | North East | hilly     |  0.86  |  134288 |      1 |
+| Uttar Pradesh | Kanshiram Nagar        | Central    | plains    |  0.846 | 1133721 |      1 |
+| Uttar Pradesh | Bahraich               | Central    | plains    |  0.846 | 3204487 |      1 |
+| Uttar Pradesh | Bara Banki             | Central    | plains    |  0.836 | 2900069 |      1 |
+| Assam         | Darrang                | North East | plains    |  0.836 |  863571 |      1 |
+| Jharkhand     | Pashchimi Singhbhum    | East       | tribal    |  0.835 | 1264425 |      1 |
+| Haryana       | Mewat                  | North      | plains    |  0.835 |  912763 |      1 |
+| Uttar Pradesh | Fatehpur               | Central    | plains    |  0.832 | 2311229 |      1 |
+| Nagaland      | Zunheboto              | North East | hilly     |  0.829 |  117956 |      1 |
+| Assam         | Bongaigaon             | North East | plains    |  0.824 |  609844 |      1 |
+| Chhattisgarh  | Bijapur                | Central    | tribal    |  0.815 |  220515 |      1 |
+| Nagaland      | Tuensang               | North East | hilly     |  0.81  |  159540 |      1 |
+| Maharashtra   | Nandurbar              | West       | tribal    |  0.765 | 1357015 |      1 |
+| Telangana     | Komaram Bheem Asifabad | South      | plains    |  0.637 |  500724 |      1 |
 
 ### Distribution
 
@@ -93,25 +97,27 @@ and reaches only 3 of 6 regions. No State Health Society could take that to a Fi
 |---|---|
 | Bihar | 4 |
 | Jharkhand | 4 |
-| Assam | 4 |
 | Uttar Pradesh | 4 |
-| Madhya Pradesh | 4 |
-| Maharashtra | 2 |
+| Assam | 3 |
+| Chhattisgarh | 2 |
+| Meghalaya | 2 |
+| Nagaland | 2 |
+| Tripura | 1 |
 | Haryana | 1 |
-| Chhattisgarh | 1 |
+| Maharashtra | 1 |
 | Telangana | 1 |
 
 | Region | Facilities |
 |---|---|
-| Central | 9 |
+| Central | 6 |
 | East | 8 |
 | North | 1 |
-| North East | 4 |
+| North East | 8 |
 | South | 1 |
-| West | 2 |
+| West | 1 |
 
 ## Caveats
 
 1. The objective rewards need-weighted population within one facility's catchment. It does not model travel time, existing facility locations (unavailable — see README), or construction cost.
-2. Because the IPHS norm is *lower* in hilly and tribal areas (3,000 vs 5,000), a facility there delivers less raw coverage gain, which mildly disadvantages those districts in the objective. They compete on need instead. The optimal allocation contains 0 non-plains districts. A defensible alternative is to divide coverage gain by the norm so a facility is worth the same everywhere; that is a policy choice, not a technical one, and it is exposed as a toggle rather than hardcoded.
+2. Because the IPHS norm is *lower* in hilly and tribal areas (3,000 vs 5,000), a facility there delivers less raw coverage gain, which mildly disadvantages those districts in the objective. They compete on need instead. The optimal allocation contains 9 non-plains districts. A defensible alternative is to divide coverage gain by the norm so a facility is worth the same everywhere; that is a policy choice, not a technical one, and it is exposed as a toggle rather than hardcoded.
 3. Weights are one defensible choice among many. Phase 4 quantifies how much of this list survives 10,000 alternative weightings.
